@@ -1,0 +1,19 @@
+# Visual Studio local state
+.vs/
+*.user
+*.suo
+CMakeUserPresets.json
+
+# Generated build files
+out/
+build/
+build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+install_manifest.txt
+
+# Local environment files
+.env
+.env.*
+!.env.example
