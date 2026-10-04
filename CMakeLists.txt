@@ -25,6 +25,8 @@ add_executable (StarGate "StarGate.cpp" "StarGate.h")
 
 # 让 StarGate 使用 GLFW。
 target_link_libraries(StarGate PRIVATE glfw)
+# Windows 多媒体库
+target_link_libraries(StarGate PRIVATE winmm)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET StarGate PROPERTY CXX_STANDARD 20)
