@@ -11,6 +11,7 @@
 #include <thread> // 用于线程休眠，控制帧率
 #include <windows.h> // Windows 定时器接口
 #include <mmsystem.h> // Windows 定时器接口
+#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 
 int main()
 {
@@ -27,7 +28,14 @@ int main()
 	}
 
 	// 创建一个窗口
-	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+
+	// 使用 OpenGL 3.3 核心模式
+	// 利点は、一つの関数で数多くのパラメータを設定できることです。
+	// 欠点は、決められた順序を厳しく守って設定する必要があることです。
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	GLFWwindow* window = glfwCreateWindow(
 		1280, 720, "StarGate", nullptr, nullptr);
@@ -38,6 +46,14 @@ int main()
 		glfwTerminate();
 		return -1;
 	}
+
+	// 将这个窗口的openGL上下文绑定到当前线程
+	glfwMakeContextCurrent(window);
+
+	// 暂时沿用现有的手动限帧
+	glfwSwapInterval(0); // 禁用垂直同步，手动控制帧率
+
+	glClearColor(0.1f, 0.2f, 0.4f, 1.0f); // 设置清屏颜色
 
 	// 进入主循环前的时间记录
 	double lastTime = glfwGetTime();
@@ -66,6 +82,22 @@ int main()
 		{
 			glfwSetWindowShouldClose(window, GLFW_TRUE);
 		}
+
+		// 渲染开始
+		// 获取实际绘图区域的宽度和高度
+		int framebufferWidth = 0;
+		int framebufferHeight = 0;
+		glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
+		// 设置绘图区域
+		glViewport(0, 0, framebufferWidth, framebufferHeight);
+
+		// 用前面的颜色清除屏幕
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// 把这一帧的渲染结果显示到屏幕上
+		glfwSwapBuffers(window); 
+		// 渲染结束
 
 		// 累计统计数据
 		accumulatedTime += deltaTime;
@@ -105,7 +137,7 @@ int main()
 
 	if (timerResolutionEnabled)
 	{
-		std:timeEndPeriod(1); // 恢复系统定时器分辨率
+		timeEndPeriod(1); // 恢复系统定时器分辨率
 	}
 
 	// 清理和退出
