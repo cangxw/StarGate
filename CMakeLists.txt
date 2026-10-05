@@ -20,11 +20,21 @@ set(GLFW_INSTALL OFF)
 # 加入 GLFW 的构建配置。
 add_subdirectory(third_party/glfw)
 
+# 将 GLAD 编译成静态库
+add_library(glad STATIC third_party/glad/src/gl.c)
+
+# 提供头文件搜索目录
+target_include_directories(glad PUBLIC third_party/glad/include)
+
 # 将源代码添加到此项目的可执行文件。
-add_executable (StarGate "StarGate.cpp" "StarGate.h")
+add_executable (StarGate 
+	"src/StarGate.cpp"
+ 	"src/Shader.h"
+	"src/Shader.cpp"
+)
 
 # 让 StarGate 使用 GLFW。
-target_link_libraries(StarGate PRIVATE glfw winmm opengl32)
+target_link_libraries(StarGate PRIVATE glfw glad winmm opengl32)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET StarGate PROPERTY CXX_STANDARD 20)
