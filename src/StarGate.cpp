@@ -123,9 +123,13 @@ int main()
 	#version 330 core
 
 	layout(location = 0) in vec3 aPosition; // 顶点位置输入
+	
+	uniform float uOffset; // 偏移量，用于在顶点着色器中移动顶点位置
+
 	void main()
 	{
-		gl_Position = vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
+		vec3 position = aPosition + vec3(uOffset, 0.0, 0.0); // 将偏移量应用到顶点位置
+		gl_Position = vec4(position, 1.0); // 将顶点位置传递给裁剪空间
 	}
 	)";
 
@@ -157,6 +161,9 @@ int main()
 		const bool timerResolutionEnabled = timeBeginPeriod(1) == TIMERR_NOERROR; // 设置系统定时器分辨率为1ms
 		lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
 
+		float offsetX = 0.0f; // 偏移量初始值
+		const float moveSpeed = 0.8f; // 偏移量变化速度
+
 		// 主循环
 		while (!glfwWindowShouldClose(window))
 		{
@@ -169,10 +176,23 @@ int main()
 			const double deltaTime = currentTime - lastTime;
 			lastTime = currentTime;
 
+			// static_cast<float> 将 double 类型的 deltaTime 转换为 float 类型，以便与 moveSpeed 相乘
+			const float moveDistance = moveSpeed * static_cast<float>(deltaTime);
+
 			// 输入处理
 			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 			{
 				glfwSetWindowShouldClose(window, GLFW_TRUE);
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+			{
+				offsetX -= moveDistance;
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+			{
+				offsetX += moveDistance;
 			}
 
 			// 渲染开始
@@ -189,6 +209,8 @@ int main()
 
 			// 选择着色器程序和顶点读取配置
 			shader.Bind();
+			shader.SetFloat("uOffset", offsetX); // 将偏移量传递给着色器
+
 			glBindVertexArray(vao);
 			glDrawArrays(GL_TRIANGLES, 0, 3); // 从第0个顶点开始，使用3个顶点绘制一个三角形
 			glBindVertexArray(0); // 绘制完成后，解绑VAO，避免后续操作意外修改它

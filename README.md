@@ -1,18 +1,23 @@
 # StarGate
 
-StarGate 是一个从零学习和实现的 C++ 游戏引擎项目，参考 [Piccolo](https://github.com/BoomingTech/Piccolo) 的设计逐步完善。
+StarGate 是一个从零学习和实现的 C++ 游戏引擎项目，参考 [Piccolo](https://github.com/BoomingTech/Piccolo) 的设计逐步完善。当前使用 OpenGL，先通过小型演示掌握渲染与引擎开发的基础。
 
 ## 当前进度
 
 - 使用 Visual Studio、CMake 和 C++20 构建。
-- 已接入 GLFW，创建初始尺寸为 1280 × 720 的窗口。
-- 创建并绑定 OpenGL 3.3 核心模式上下文，实现蓝色背景清屏和双缓冲显示。
+- 接入 GLFW，创建初始尺寸为 1280 × 720 的窗口，处理窗口事件与键盘输入。
+- 创建 OpenGL 3.3 核心模式上下文，通过 GLAD 加载现代 OpenGL 函数。
+- 使用 VAO、VBO、顶点着色器和片段着色器，在蓝色背景上绘制橙色三角形。
+- 将着色器编译、链接、错误输出、绑定和资源释放整理到 `Shader` 类中，并提供 `SetFloat` 设置 uniform。
+- 按住 A / D 左右平移三角形，通过 `uOffset` 将偏移量传入顶点着色器；移动距离根据 `deltaTime` 计算。
 - 每帧查询帧缓冲区的实际像素尺寸并设置视口，适应窗口大小变化。
-- 计算帧间时间差，每 0.5 秒在窗口标题中更新平均 FPS 和平均帧耗时。
+- 每 0.5 秒在窗口标题中更新平均 FPS 和平均帧耗时。
 - 使用线程休眠进行手动限帧，目标为 60 FPS；在 Windows 上请求 1 毫秒定时器分辨率，并在退出时释放请求。
-- 支持窗口事件处理、Esc 退出和基础错误输出。
+- 支持 Esc 退出，并在销毁 OpenGL 上下文前释放绘制资源。
 
-当前完成的是窗口与基础清屏阶段，尚未绘制三角形或三维模型，也未接入物理系统。垂直同步暂时关闭，实际帧率会受到休眠精度和线程调度等因素影响，手动限帧不保证严格达到 60 FPS。
+目前完成了基础三角形渲染、着色器封装和键盘平移。尚未实现矩阵变换、三维摄像机、纹理、模型加载、物理系统或编辑器。
+
+垂直同步暂时关闭，手动限帧不保证严格达到 60 FPS。窗口标题中的平均帧耗时包含限帧等待时间。
 
 ## 构建与运行
 
@@ -21,10 +26,17 @@ StarGate 是一个从零学习和实现的 C++ 游戏引擎项目，参考 [Picc
 1. 在 Visual Studio Installer 中安装“使用 C++ 的桌面开发”，并确认包含“用于 Windows 的 C++ CMake 工具”。
 2. 克隆仓库后，在 Visual Studio 中通过“文件 → 打开 → 文件夹”打开包含 `CMakeLists.txt` 的根目录。
 3. 等待 CMake 配置完成，选择 `x64 Debug` 配置和 `StarGate` 启动项。
-4. 按 `Ctrl + F5` 运行，应看到蓝色背景，窗口标题显示 FPS 和平均帧耗时。
-5. 按 `Esc` 或点击窗口关闭按钮退出。
+4. 按 `Ctrl + F5` 运行，应看到蓝色背景上的橙色三角形，窗口标题显示 FPS 和平均帧耗时。
 
-GLFW 源码已包含在 `third_party/glfw` 中，无需额外下载。当前清屏使用 Windows 提供的基础 OpenGL 接口，CMake 已配置链接 `glfw`、`winmm` 和 `opengl32`。
+| 操作 | 效果 |
+| --- | --- |
+| 按住 A | 向左移动三角形 |
+| 按住 D | 向右移动三角形 |
+| Esc 或关闭窗口 | 退出程序 |
+
+三角形可以移出窗口，按相反方向的键可将其移回。
+
+GLFW 和 GLAD 的源码已包含在仓库中，无需额外下载。CMake 已配置构建依赖并链接 `glfw`、`glad`、`winmm` 和 `opengl32`。
 
 ## 目录结构
 
@@ -32,17 +44,28 @@ GLFW 源码已包含在 `third_party/glfw` 中，无需额外下载。当前清�
 StarGate/
 ├── CMakeLists.txt       # 构建目标和依赖
 ├── CMakePresets.json    # Visual Studio 构建配置
-├── StarGate.cpp         # 程序入口、窗口循环、帧时间统计和 OpenGL 清屏
-├── StarGate.h           # 预留项目头文件，当前未使用
-└── third_party/glfw/    # GLFW 源码
+├── README.md
+├── src/
+│   ├── StarGate.cpp     # 程序入口、主循环、输入和三角形绘制
+│   ├── StarGate.h       # 预留项目头文件，当前未使用
+│   ├── Shader.h         # 着色器类声明
+│   └── Shader.cpp       # 着色器编译、链接和资源管理
+└── third_party/
+    ├── glfw/            # GLFW 源码
+    └── glad/            # 生成的 OpenGL 3.3 Core 加载代码
+        ├── include/
+        └── src/gl.c
 ```
 
-## 后续计划
+## 后续目标
 
-下一步接入 GLAD，加载现代 OpenGL 接口，并绘制第一个三角形。之后逐步实现输入管理、三维摄像机、纹理与模型加载、基础光照、场景和资源管理。
+- **下一步：**引入变换矩阵，实现平移、旋转和缩放。
+- **第一个月目标：**逐步完成三维物体、深度测试、透视投影、摄像机、纹理、基础光照和简单模型加载，形成可交互的三维演示。
+- **第二个月目标：**整理场景与资源管理，加入基础编辑界面，支持选择物体、修改属性，以及保存和重新加载场景。
 
-后续计划扩展 Vulkan 渲染后端，并支持在启动时选择 OpenGL 或 Vulkan；目前尚未实现后端切换。
+这些是学习目标，具体范围会根据实际进度调整。优先完成能够运行、演示并解释实现的小引擎；完整复刻 Piccolo 是长期目标。Vulkan 渲染后端和 AI 集成留作后续探索，目前尚未实现。
 
 ## 第三方依赖
 
-[GLFW](https://www.glfw.org/) 用于窗口、输入与 OpenGL 上下文管理，其许可说明保留在 [third_party/glfw/LICENSE.md](third_party/glfw/LICENSE.md) 中。
+- [GLFW](https://www.glfw.org/)：用于窗口、输入与 OpenGL 上下文管理。许可说明保留在 [third_party/glfw/LICENSE.md](third_party/glfw/LICENSE.md) 中。
+- [GLAD](https://github.com/Dav1dde/glad)：用于加载现代 OpenGL 函数。当前生成配置为 OpenGL 3.3 Core，文件位于 `third_party/glad`。
