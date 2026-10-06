@@ -12,6 +12,8 @@
 #include <thread> // 用于线程休眠，控制帧率
 #include <windows.h> // Windows 定时器接口
 #include <mmsystem.h> // Windows 定时器接口
+#include <glm/glm.hpp> // 用于矩阵和向量操作
+#include <glm/gtc/matrix_transform.hpp> // 用于矩阵变换
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -123,13 +125,12 @@ int main()
 	#version 330 core
 
 	layout(location = 0) in vec3 aPosition; // 顶点位置输入
-	
-	uniform float uOffset; // 偏移量，用于在顶点着色器中移动顶点位置
+
+	uniform mat4 uTransform;
 
 	void main()
 	{
-		vec3 position = aPosition + vec3(uOffset, 0.0, 0.0); // 将偏移量应用到顶点位置
-		gl_Position = vec4(position, 1.0); // 将顶点位置传递给裁剪空间
+		gl_Position = uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
 	}
 	)";
 
@@ -164,6 +165,22 @@ int main()
 		float offsetX = 0.0f; // 偏移量初始值
 		const float moveSpeed = 0.8f; // 偏移量变化速度
 
+		float rotationAngle = 0.0f; // 旋转角度初始值
+		const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
+
+		float scaleFactor = 1.0f; // 缩放因子初始值
+		glfwSetWindowUserPointer(window, &scaleFactor); // 将缩放因子指针存储在窗口的用户指针中
+		glfwSetScrollCallback(window,
+			[](GLFWwindow* window, double, double yoffset)
+			{
+				// 取回缩放变量的地址
+				float* scale = static_cast<float*>(glfwGetWindowUserPointer(window));
+
+				*scale += static_cast<float>(yoffset) * 0.1f; // 根据滚轮滚动调整缩放因子
+				if (*scale < 0.1f) *scale = 0.1f; // 限制最小缩放因子
+			}
+		);
+
 		// 主循环
 		while (!glfwWindowShouldClose(window))
 		{
@@ -195,6 +212,16 @@ int main()
 				offsetX += moveDistance;
 			}
 
+			const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
+			if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+			{
+				rotationAngle += rotationStep; // 逆时针旋转
+			}
+			if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+			{
+				rotationAngle -= rotationStep; // 顺时针旋转
+			}
+
 			// 渲染开始
 			// 获取实际绘图区域的宽度和高度
 			int framebufferWidth = 0;
@@ -208,8 +235,15 @@ int main()
 			glClear(GL_COLOR_BUFFER_BIT);
 
 			// 选择着色器程序和顶点读取配置
+			glm::mat4 transform(1.0f); // 初始化为单位矩阵
+			transform = glm::translate(transform, glm::vec3(offsetX, 0, 0));
+			//glm::radians(rotationAngle) 将角度转换为弧度，因为glm::rotate函数需要弧度值
+			// glm::vec3(0, 0, 1) 表示绕Z轴旋转，这里假设三角形在XY平面上
+			transform = glm::rotate(transform, glm::radians(rotationAngle), glm::vec3(0, 0, 1));
+			transform = glm::scale(transform, glm::vec3(scaleFactor, scaleFactor, 1.0f));
+
 			shader.Bind();
-			shader.SetFloat("uOffset", offsetX); // 将偏移量传递给着色器
+			shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
 
 			glBindVertexArray(vao);
 			glDrawArrays(GL_TRIANGLES, 0, 3); // 从第0个顶点开始，使用3个顶点绘制一个三角形
@@ -260,6 +294,8 @@ int main()
 			timeEndPeriod(1); // 恢复系统定时器分辨率
 		}
 
+		glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
+		glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
 
 		// 释放VBO
 		glDeleteVertexArrays(1, &vao);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glad/gl.h>
+#include <glm/glm.hpp>
 
 class Shader
 {
@@ -17,6 +18,8 @@ public:
 	bool IsValid() const;
 	// 设置float变量的值
 	void SetFloat(const char* name, float value) const;
+	// 设置4x4矩阵变量的值
+	void SetMat4(const char* name, const glm::mat4& value) const;
 
 	// 禁止复制，避免两个对象重复释放同一个着色器程序
 	Shader(const Shader&) = delete;

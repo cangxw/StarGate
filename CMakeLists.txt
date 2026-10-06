@@ -33,6 +33,9 @@ add_executable (StarGate
 	"src/Shader.cpp"
 )
 
+# 再给这个目标设置头文件搜索目录
+target_include_directories(StarGate PRIVATE third_party/glm)
+
 # 让 StarGate 使用 GLFW。
 target_link_libraries(StarGate PRIVATE glfw glad winmm opengl32)
 

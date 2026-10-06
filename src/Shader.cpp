@@ -1,5 +1,6 @@
 #include "Shader.h"
 #include <iostream>
+#include <glm/gtc/type_ptr.hpp> // 用于将glm::mat4转换为float数组
 
 static GLuint CompileShader(GLenum type, const char* source)
 {	
@@ -118,6 +119,24 @@ void Shader::SetFloat(const char* name, float value) const
 		if (location != -1)
 		{
 			glUniform1f(location, value);
+		}
+		else
+		{
+			std::cerr << "Warning: Uniform '" << name << "' not found in shader program." << std::endl;
+		}
+	}
+}
+
+void Shader::SetMat4(const char* name, const glm::mat4& value) const
+{
+	if (m_ProgramID != 0)
+	{
+		const GLint location = glGetUniformLocation(m_ProgramID, name);
+		if (location != -1)
+		{
+			// location 是uniform变量在着色器程序中的位置，1表示只设置一个矩阵，
+			// GL_FALSE表示不需要转置矩阵，glm::value_ptr(value)获取矩阵的指针，以便OpenGL可以读取数据
+			glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(value));
 		}
 		else
 		{
