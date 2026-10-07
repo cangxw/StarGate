@@ -75,6 +75,7 @@ int main()
 	glfwSwapInterval(0); // 不请求垂直同步，后面通过休眠手动限帧
 
 	glClearColor(0.1f, 0.2f, 0.4f, 1.0f); // 设置清屏颜色
+	glEnable(GL_DEPTH_TEST);
 
 	double lastTime = glfwGetTime(); // 进入主循环前的时间记录
 	double accumulatedTime = 0.0; // 累计时间，用于计算FPS
@@ -83,10 +84,61 @@ int main()
 	const double targetFrameTime = 1.0 / 60.0; // 目标帧时间，60 FPS
 
 	// 绘制三角形
-	const float  vertices[] = {
-		-0.5f, -0.5f, 0.0f, // 左下角
-		0.5f, -0.5f, 0.0f,  // 右下角
-		0.0f,  0.5f, 0.0f   // 顶部
+	//const float  vertices[] = {
+	//	-0.5f, -0.5f, 0.0f, // 左下角
+	//	0.5f, -0.5f, 0.0f,  // 右下角
+	//	0.0f,  0.5f, 0.0f   // 顶部
+	//};
+
+	// 立方体
+	const float vertices[] = {
+		// 后面：Z = -0.5
+		-0.5f, -0.5f, -0.5f,
+		-0.5f,  0.5f, -0.5f,
+		 0.5f,  0.5f, -0.5f,
+		 0.5f,  0.5f, -0.5f,
+		 0.5f, -0.5f, -0.5f,
+		-0.5f, -0.5f, -0.5f,
+
+		// 前面：Z = 0.5
+		-0.5f, -0.5f,  0.5f,
+		 0.5f, -0.5f,  0.5f,
+		 0.5f,  0.5f,  0.5f,
+		 0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f,  0.5f,
+		-0.5f, -0.5f,  0.5f,
+
+		// 左面：X = -0.5
+		-0.5f, -0.5f, -0.5f,
+		-0.5f, -0.5f,  0.5f,
+		-0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f,  0.5f,
+		-0.5f,  0.5f, -0.5f,
+		-0.5f, -0.5f, -0.5f,
+
+		// 右面：X = 0.5
+		 0.5f, -0.5f, -0.5f,
+		 0.5f,  0.5f, -0.5f,
+		 0.5f,  0.5f,  0.5f,
+		 0.5f,  0.5f,  0.5f,
+		 0.5f, -0.5f,  0.5f,
+		 0.5f, -0.5f, -0.5f,
+
+		 // 底面：Y = -0.5
+		 -0.5f, -0.5f, -0.5f,
+		  0.5f, -0.5f, -0.5f,
+		  0.5f, -0.5f,  0.5f,
+		  0.5f, -0.5f,  0.5f,
+		 -0.5f, -0.5f,  0.5f,
+		 -0.5f, -0.5f, -0.5f,
+
+		 // 顶面：Y = 0.5
+		 -0.5f,  0.5f, -0.5f,
+		 -0.5f,  0.5f,  0.5f,
+		  0.5f,  0.5f,  0.5f,
+		  0.5f,  0.5f,  0.5f,
+		  0.5f,  0.5f, -0.5f,
+		 -0.5f,  0.5f, -0.5f
 	};
 
 	// 创建并绑定顶点数组对象（VAO）
@@ -128,21 +180,26 @@ int main()
 
 	uniform mat4 uTransform;
 	uniform mat4 uProjection;
+	uniform mat4 uView;
+
+	out vec3 vertexColor;
 
 	void main()
 	{
-		gl_Position = uProjection * uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
+		gl_Position = uProjection* uView * uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
+		vertexColor = aPosition + vec3(0.5);
 	}
 	)";
 
 	const char* fragmentShaderSource = R"(
 	#version 330 core
 
+	in vec3 vertexColor;
 	out vec4 fragmentColor; // 输出颜色
 
 	void main()
 	{
-		fragmentColor = vec4(1.0, 0.6, 0.2, 1.0); // 设置输出颜色为橙色
+		fragmentColor = vec4(vertexColor, 1.0); // 设置输出颜色为橙色
 	}
 	)";
 
@@ -166,7 +223,7 @@ int main()
 		float offsetX = 0.0f; // 偏移量初始值
 		const float moveSpeed = 0.8f; // 偏移量变化速度
 
-		float rotationAngle = 0.0f; // 旋转角度初始值
+		float rotationAngle = 30.0f; // 旋转角度初始值
 		const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
 
 		float scaleFactor = 1.0f; // 缩放因子初始值
@@ -239,28 +296,46 @@ int main()
 
 			const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
 			// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
-			const glm::mat4 projection = glm::ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f);
+			//const glm::mat4 projection = glm::ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f);
+			
+			// OpenGL 右手系，默认朝向-z方向
+			// Unity 左手系
+			const glm::mat4 projection = glm::perspective(
+				glm::radians(45.0f), // 视野角度，单位为弧度
+				aspectRatio, 
+				0.1f, 
+				100.0f // 近平面和远平面距离
+			); // 透视投影矩阵
+
+			const glm::mat4 view = glm::translate(
+				glm::mat4(1.0f),  // 初始化为单位矩阵
+				glm::vec3(0.0f, 0.0f, -3.0f) // 将相机向后移动3个单位，相当于003
+			); // 视图矩阵，向后移动相机
 
 			// 设置绘图区域
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
 
-			// 用前面的颜色清除屏幕
-			glClear(GL_COLOR_BUFFER_BIT);
+			// 用前面的颜色清除屏幕 包括深度缓存
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 			// 选择着色器程序和顶点读取配置
 			glm::mat4 transform(1.0f); // 初始化为单位矩阵
 			transform = glm::translate(transform, glm::vec3(offsetX, 0, 0));
 			//glm::radians(rotationAngle) 将角度转换为弧度，因为glm::rotate函数需要弧度值
 			// glm::vec3(0, 0, 1) 表示绕Z轴旋转，这里假设三角形在XY平面上
-			transform = glm::rotate(transform, glm::radians(rotationAngle), glm::vec3(0, 0, 1));
-			transform = glm::scale(transform, glm::vec3(scaleFactor, scaleFactor, 1.0f));
+			transform = glm::rotate(transform, glm::radians(rotationAngle), glm::vec3(0, 1, 0));
+
+			// 稍微倾斜一点，让顶部看见
+			transform = glm::rotate(transform, glm::radians(20.0f), glm::vec3(1, 0, 0));
+			transform = glm::scale(transform, glm::vec3(scaleFactor));
 
 			shader.Bind();
 			shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
+			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 
 			glBindVertexArray(vao);
-			glDrawArrays(GL_TRIANGLES, 0, 3); // 从第0个顶点开始，使用3个顶点绘制一个三角形
+			glDrawArrays(GL_TRIANGLES, 0, 36); // 从第0个顶点开始，使用3个顶点绘制一个三角形
 			glBindVertexArray(0); // 绘制完成后，解绑VAO，避免后续操作意外修改它
 
 			// 把这一帧的渲染结果显示到屏幕上
