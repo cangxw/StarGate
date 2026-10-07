@@ -83,62 +83,26 @@ int main()
 
 	const double targetFrameTime = 1.0 / 60.0; // 目标帧时间，60 FPS
 
-	// 绘制三角形
-	//const float  vertices[] = {
-	//	-0.5f, -0.5f, 0.0f, // 左下角
-	//	0.5f, -0.5f, 0.0f,  // 右下角
-	//	0.0f,  0.5f, 0.0f   // 顶部
-	//};
-
-	// 立方体
+	// 绘制立方体
 	const float vertices[] = {
-		// 后面：Z = -0.5
-		-0.5f, -0.5f, -0.5f,
-		-0.5f,  0.5f, -0.5f,
-		 0.5f,  0.5f, -0.5f,
-		 0.5f,  0.5f, -0.5f,
-		 0.5f, -0.5f, -0.5f,
-		-0.5f, -0.5f, -0.5f,
+		// X      Y      Z
+		-0.5f, -0.5f, -0.5f, // 0
+		 0.5f, -0.5f, -0.5f, // 1
+		 0.5f,  0.5f, -0.5f, // 2
+		-0.5f,  0.5f, -0.5f, // 3
+		-0.5f, -0.5f,  0.5f, // 4
+		 0.5f, -0.5f,  0.5f, // 5
+		 0.5f,  0.5f,  0.5f, // 6
+		-0.5f,  0.5f,  0.5f  // 7
+	};
 
-		// 前面：Z = 0.5
-		-0.5f, -0.5f,  0.5f,
-		 0.5f, -0.5f,  0.5f,
-		 0.5f,  0.5f,  0.5f,
-		 0.5f,  0.5f,  0.5f,
-		-0.5f,  0.5f,  0.5f,
-		-0.5f, -0.5f,  0.5f,
-
-		// 左面：X = -0.5
-		-0.5f, -0.5f, -0.5f,
-		-0.5f, -0.5f,  0.5f,
-		-0.5f,  0.5f,  0.5f,
-		-0.5f,  0.5f,  0.5f,
-		-0.5f,  0.5f, -0.5f,
-		-0.5f, -0.5f, -0.5f,
-
-		// 右面：X = 0.5
-		 0.5f, -0.5f, -0.5f,
-		 0.5f,  0.5f, -0.5f,
-		 0.5f,  0.5f,  0.5f,
-		 0.5f,  0.5f,  0.5f,
-		 0.5f, -0.5f,  0.5f,
-		 0.5f, -0.5f, -0.5f,
-
-		 // 底面：Y = -0.5
-		 -0.5f, -0.5f, -0.5f,
-		  0.5f, -0.5f, -0.5f,
-		  0.5f, -0.5f,  0.5f,
-		  0.5f, -0.5f,  0.5f,
-		 -0.5f, -0.5f,  0.5f,
-		 -0.5f, -0.5f, -0.5f,
-
-		 // 顶面：Y = 0.5
-		 -0.5f,  0.5f, -0.5f,
-		 -0.5f,  0.5f,  0.5f,
-		  0.5f,  0.5f,  0.5f,
-		  0.5f,  0.5f,  0.5f,
-		  0.5f,  0.5f, -0.5f,
-		 -0.5f,  0.5f, -0.5f
+	const unsigned int indices[] = {
+		0, 3, 2,  2, 1, 0, // 后面
+		4, 5, 6,  6, 7, 4, // 前面
+		0, 4, 7,  7, 3, 0, // 左面
+		1, 2, 6,  6, 5, 1, // 右面
+		0, 1, 5,  5, 4, 0, // 底面
+		3, 7, 6,  6, 2, 3  // 顶面
 	};
 
 	// 创建并绑定顶点数组对象（VAO）
@@ -147,7 +111,7 @@ int main()
 	glBindVertexArray(vao);
 
 	// 创建顶点缓冲对象（VBO
-	GLuint vbo = 0; // vob保存的是对象编号
+	GLuint vbo = 0; // vbo保存的是对象编号
 	glGenBuffers(1, &vbo);  // 生成一个缓冲对象编号，并写入vbo
 	// 将这个缓冲对象绑定为当前的顶点缓冲区
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
@@ -168,6 +132,11 @@ int main()
 
 	// 启用编号为0的顶点属性数组
 	glEnableVertexAttribArray(0); 
+
+	GLuint ebo = 0;
+	glGenBuffers(1, &ebo);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
 	// 设置完成，取消当前VAO的绑定，避免后续操作意外修改它
 	glBindVertexArray(0);
@@ -211,6 +180,7 @@ int main()
 
 			glDeleteVertexArrays(1, &vao);
 			glDeleteBuffers(1, &vbo);
+			glDeleteBuffers(1, &ebo);
 			glfwDestroyWindow(window);
 			glfwTerminate();
 			return -1;
@@ -335,7 +305,8 @@ int main()
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 
 			glBindVertexArray(vao);
-			glDrawArrays(GL_TRIANGLES, 0, 36); // 从第0个顶点开始，使用3个顶点绘制一个三角形
+			//glDrawArrays(GL_TRIANGLES, 0, 36); // 从第0个顶点开始，使用3个顶点绘制一个三角形
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr); // 用索引绘制
 			glBindVertexArray(0); // 绘制完成后，解绑VAO，避免后续操作意外修改它
 
 			// 把这一帧的渲染结果显示到屏幕上
@@ -389,6 +360,7 @@ int main()
 		// 释放VBO
 		glDeleteVertexArrays(1, &vao);
 		glDeleteBuffers(1, &vbo);
+		glDeleteBuffers(1, &ebo);
 	}
 	// Shader已经释放，现在销毁OpenGL Context
 	glfwDestroyWindow(window);
