@@ -127,10 +127,11 @@ int main()
 	layout(location = 0) in vec3 aPosition; // 顶点位置输入
 
 	uniform mat4 uTransform;
+	uniform mat4 uProjection;
 
 	void main()
 	{
-		gl_Position = uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
+		gl_Position = uProjection * uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
 	}
 	)";
 
@@ -228,6 +229,18 @@ int main()
 			int framebufferHeight = 0;
 			glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
 
+			// 最小化等情况下，绘图区域可能为0，暂时跳过绘制
+			if (framebufferWidth == 0 || framebufferHeight == 0)
+			{
+				// 休眠一小段时间，避免CPU空转
+				std::this_thread::sleep_for(std::chrono::milliseconds(16));
+				continue;
+			}
+
+			const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
+			// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
+			const glm::mat4 projection = glm::ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f);
+
 			// 设置绘图区域
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
 
@@ -244,6 +257,7 @@ int main()
 
 			shader.Bind();
 			shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
+			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 
 			glBindVertexArray(vao);
 			glDrawArrays(GL_TRIANGLES, 0, 3); // 从第0个顶点开始，使用3个顶点绘制一个三角形
