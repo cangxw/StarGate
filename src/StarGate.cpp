@@ -209,6 +209,13 @@ int main()
 			}
 		);
 
+		// 相机相关
+		glm::vec3 cameraPosition(0.0f, 0.0f, 3.0f); //摄像机位置
+		glm::vec3 cameraFront(0.0f, 0.0f, -1.0f);    // 观察方向
+		const glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);// 摄像机向上的参考方向
+
+		const float cameraSpeed = 2.5f; 
+
 		// 主循环
 		while (!glfwWindowShouldClose(window))
 		{
@@ -230,12 +237,12 @@ int main()
 				glfwSetWindowShouldClose(window, GLFW_TRUE);
 			}
 
-			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+			if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
 			{
 				offsetX -= moveDistance;
 			}
 
-			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+			if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
 			{
 				offsetX += moveDistance;
 			}
@@ -248,6 +255,36 @@ int main()
 			if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 			{
 				rotationAngle -= rotationStep; // 顺时针旋转
+			}
+
+			// 处理相机输入
+			const float cameraStep = cameraSpeed * static_cast<float>(deltaTime);
+			const glm::vec3 cameraRight = glm::normalize(glm::cross(cameraFront, cameraUp));
+			glm::vec3 movement(0.0f); //累计本帧的移动方向
+
+			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+			{
+				movement += cameraFront;
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+			{
+				movement -= cameraFront;
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+			{
+				movement -= cameraRight;
+			}
+
+			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+			{
+				movement += cameraRight;
+			}
+
+			if (glm::length(movement) > 0.0f)
+			{
+				cameraPosition += glm::normalize(movement) * cameraStep;
 			}
 
 			// 渲染开始
@@ -277,10 +314,16 @@ int main()
 				100.0f // 近平面和远平面距离
 			); // 透视投影矩阵
 
-			const glm::mat4 view = glm::translate(
-				glm::mat4(1.0f),  // 初始化为单位矩阵
-				glm::vec3(0.0f, 0.0f, -3.0f) // 将相机向后移动3个单位，相当于003
-			); // 视图矩阵，向后移动相机
+			//const glm::mat4 view = glm::translate(
+			//	glm::mat4(1.0f),  // 初始化为单位矩阵
+			//	glm::vec3(0.0f, 0.0f, -3.0f) // 将相机向后移动3个单位，相当于003
+			//); // 视图矩阵，向后移动相机
+
+			const glm::mat4 view = glm::lookAt(
+				cameraPosition,							// 摄像机在哪里
+				cameraPosition + cameraFront,  // 摄像机看向哪个目标点
+				cameraUp									// 向上参考方向
+			);
 
 			// 设置绘图区域
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
