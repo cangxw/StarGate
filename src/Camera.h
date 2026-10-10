@@ -12,6 +12,7 @@ public:
 
 	// 获取视图矩阵
 	glm::mat4 GetViewMatrix() const;
+	glm::vec3 GetPosition() const;
 private:
 	void UpdateDirection();
 

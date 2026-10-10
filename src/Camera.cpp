@@ -42,6 +42,11 @@ glm::mat4 Camera::GetViewMatrix() const
 	);
 }
 
+glm::vec3 Camera::GetPosition() const
+{
+	return m_Position;
+}
+
 void Camera::UpdateDirection()
 {
 	const float yawRadians = glm::radians(m_Yaw);

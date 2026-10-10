@@ -225,11 +225,14 @@ int main()
 	// 本机可以传输 128个
 	out vec2 vTexCoord;
 	out vec3 vNormal;
+	out vec3 vWorldPosition;
 
 	void main()
 	{
-		gl_Position = uProjection* uView * uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
+		vec4 worldPosition = uTransform * vec4(aPosition, 1.0);
+		gl_Position = uProjection* uView * worldPosition; // 将顶点位置传递给裁剪空间
 		
+		vWorldPosition = worldPosition.xyz;
 		vTexCoord = aTexCoord;
 
 		// 需要将模型局部空间的法线转换到世界空间，保证在模型发生变形后，法线依然垂直于表面
@@ -244,12 +247,16 @@ int main()
 
 	in vec2 vTexCoord;
 	in vec3 vNormal;
+	in vec3 vWorldPosition;
 
 	uniform sampler2D uTexture;
 
 	uniform vec3 uToLightDirection;
 	uniform vec3 uLightColor;
 	uniform float uAmbientStrength;
+	uniform vec3 uCameraPosition;
+	uniform float uSpecularStrength;
+	uniform float uShininess;
 
 	out vec4 fragmentColor; // 输出颜色
 
@@ -269,9 +276,30 @@ int main()
 		// 漫反射使用光源颜色
 		vec3 diffuseLight = 0.8 * diffuse * uLightColor;
 
+		// 高光部分
+		// 从表面指向相机	
+		vec3 toCamera = normalize(uCameraPosition - vWorldPosition);
+		// 光线照射到表面后 反射的方向 Phong模型比较相机方向和反射方向的夹角大小
+		// vec3 reflectedDirection = reflect(-toLight, normal);
+
+		float specular = 0.0;
+		// 光源位于表面正面时，才计算高光
+		if(diffuse > 0.0)
+		{
+			// 半程向量，Blinn-Phong模型比较半程和法线的夹角
+			vec3 halfwayDirection = normalize(toLight + toCamera);
+
+			specular = pow(
+				max(dot(normal, halfwayDirection), 0.0),
+				uShininess
+			);
+		}
+
+		vec3 specularLight = uSpecularStrength * specular * uLightColor;
+
 		// 光照贡献可以叠加。例如一个表面同时被两盏灯照亮，可以分别计算每盏灯的贡献，再相加
 		fragmentColor = vec4(
-			baseColor.rgb * (ambientLight + diffuseLight), 
+			baseColor.rgb * (ambientLight + diffuseLight) + specularLight, 
 			baseColor.a
 		);
 	}
@@ -377,7 +405,7 @@ int main()
 		// ------------------------创建纹理 END-----------------------------------------
 
 		// ------------------------光照信息-----------------------------------------
-		glm::vec3 toLightDirection(0.5f, 1.0f, 0.3f);
+		glm::vec3 toLightDirection(0.0f, 0.0f, 1.0f);
 		glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
 		float ambientStrength = 0.2f;
 		// ------------------------光照信息 END-----------------------------------------
@@ -388,7 +416,7 @@ int main()
 		float offsetX = 0.0f; // 偏移量初始值
 		const float moveSpeed = 0.8f; // 偏移量变化速度
 
-		float rotationAngle = 30.0f; // 旋转角度初始值
+		float rotationAngle = 0.0f; // 旋转角度初始值
 		const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
 
 		Camera camera;
@@ -577,8 +605,11 @@ int main()
 
 			shader.Bind();
 			shader.SetFloat("uAmbientStrength", ambientStrength);
+			shader.SetFloat("uSpecularStrength", 1.0f);
+			shader.SetFloat("uShininess", 128.0f);
 			shader.SetVec3("uToLightDirection", toLightDirection);
 			shader.SetVec3("uLightColor", lightColor);
+			shader.SetVec3("uCameraPosition", camera.GetPosition());
 			shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
 			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
