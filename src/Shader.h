@@ -20,6 +20,7 @@ public:
 	void SetInt(const char* name, int value) const;
 	// 设置float变量的值
 	void SetFloat(const char* name, float value) const;
+	void SetVec3(const char* name, const glm::vec3& value) const;
 	// 设置4x4矩阵变量的值
 	void SetMat4(const char* name, const glm::mat4& value) const;
 

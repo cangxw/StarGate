@@ -14,6 +14,7 @@
 #include <mmsystem.h> // Windows 定时器接口
 #include <glm/glm.hpp> // 用于矩阵和向量操作
 #include <glm/gtc/matrix_transform.hpp> // 用于矩阵变换
+#include <stb_image.h>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -97,43 +98,43 @@ int main()
 
 	// 绘制立方体
 	const float vertices[] = {
-		// X      Y      Z       U     V
+		// X     Y     Z      U     V      Nx    Ny    Nz
 
-		// 后面：0～3
-		 0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-		-0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
-		-0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
-		 0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+		// 后面：0～3，朝 -Z
+		 0.5f, -0.5f, -0.5f, 0.0f, 0.0f,  0.0f,  0.0f, -1.0f,
+		-0.5f, -0.5f, -0.5f, 1.0f, 0.0f,  0.0f,  0.0f, -1.0f,
+		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f,  0.0f,  0.0f, -1.0f,
+		 0.5f,  0.5f, -0.5f, 0.0f, 1.0f,  0.0f,  0.0f, -1.0f,
 
-		 // 前面：4～7
-		 -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
-		  0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-		  0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-		 -0.5f,  0.5f,  0.5f,   0.0f, 1.0f,
+		 // 前面：4～7，朝 +Z
+		 -0.5f, -0.5f,  0.5f, 0.0f, 0.0f,  0.0f,  0.0f,  1.0f,
+		  0.5f, -0.5f,  0.5f, 1.0f, 0.0f,  0.0f,  0.0f,  1.0f,
+		  0.5f,  0.5f,  0.5f, 1.0f, 1.0f,  0.0f,  0.0f,  1.0f,
+		 -0.5f,  0.5f,  0.5f, 0.0f, 1.0f,  0.0f,  0.0f,  1.0f,
 
-		 // 左面：8～11
-		 -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-		 -0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
-		 -0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
-		 -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+		 // 左面：8～11，朝 -X
+		 -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f,  0.0f,  0.0f,
+		 -0.5f, -0.5f,  0.5f, 1.0f, 0.0f, -1.0f,  0.0f,  0.0f,
+		 -0.5f,  0.5f,  0.5f, 1.0f, 1.0f, -1.0f,  0.0f,  0.0f,
+		 -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, -1.0f,  0.0f,  0.0f,
 
-		 // 右面：12～15
-		  0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
-		  0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
-		  0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
-		  0.5f,  0.5f,  0.5f,   0.0f, 1.0f,
+		 // 右面：12～15，朝 +X
+		  0.5f, -0.5f,  0.5f, 0.0f, 0.0f,  1.0f,  0.0f,  0.0f,
+		  0.5f, -0.5f, -0.5f, 1.0f, 0.0f,  1.0f,  0.0f,  0.0f,
+		  0.5f,  0.5f, -0.5f, 1.0f, 1.0f,  1.0f,  0.0f,  0.0f,
+		  0.5f,  0.5f,  0.5f, 0.0f, 1.0f,  1.0f,  0.0f,  0.0f,
 
-		  // 底面：16～19
-		  -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
-		   0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
-		   0.5f, -0.5f,  0.5f,   1.0f, 1.0f,
-		  -0.5f, -0.5f,  0.5f,   0.0f, 1.0f,
+		  // 底面：16～19，朝 -Y
+		  -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,  0.0f, -1.0f,  0.0f,
+		   0.5f, -0.5f, -0.5f, 1.0f, 0.0f,  0.0f, -1.0f,  0.0f,
+		   0.5f, -0.5f,  0.5f, 1.0f, 1.0f,  0.0f, -1.0f,  0.0f,
+		  -0.5f, -0.5f,  0.5f, 0.0f, 1.0f,  0.0f, -1.0f,  0.0f,
 
-		  // 顶面：20～23
-		  -0.5f,  0.5f,  0.5f,   0.0f, 0.0f,
-		   0.5f,  0.5f,  0.5f,   1.0f, 0.0f,
-		   0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
-		  -0.5f,  0.5f, -0.5f,   0.0f, 1.0f
+		  // 顶面：20～23，朝 +Y
+		  -0.5f,  0.5f,  0.5f, 0.0f, 0.0f,  0.0f,  1.0f,  0.0f,
+		   0.5f,  0.5f,  0.5f, 1.0f, 0.0f,  0.0f,  1.0f,  0.0f,
+		   0.5f,  0.5f, -0.5f, 1.0f, 1.0f,  0.0f,  1.0f,  0.0f,
+		  -0.5f,  0.5f, -0.5f, 0.0f, 1.0f,  0.0f,  1.0f,  0.0f
 	};
 
 	const unsigned int indices[] = {
@@ -167,7 +168,7 @@ int main()
 		3,							// 每个顶点属性的分量数量，这里是3个（x, y, z）
 		GL_FLOAT,			// 数据类型
 		GL_FALSE,			// 是否归一化
-		5 * sizeof(float),	// 步长（每个顶点的字节数）
+		8 * sizeof(float),	// 步长（每个顶点的字节数）
 		nullptr					// 从缓冲区的第0个字节开始读取数据
 	);
 
@@ -180,12 +181,25 @@ int main()
 		2,
 		GL_FLOAT,
 		GL_FALSE,
-		5 * sizeof(float),
+		8 * sizeof(float),
 		reinterpret_cast<const void*>(3 * sizeof(float))
 	);
 
 	// 启用编号为1的顶点属性数组
 	glEnableVertexAttribArray(1);
+
+	//属性2 ：法线方向，跳过位置和UV五个float
+	glVertexAttribPointer(
+		2,
+		3,
+		GL_FLOAT,
+		GL_FALSE,
+		8 * sizeof(float),
+		reinterpret_cast<const void*>(5 * sizeof(float))
+	);
+
+	// 启用编号为2的顶点属性数组
+	glEnableVertexAttribArray(2);
 
 	GLuint ebo = 0;
 	glGenBuffers(1, &ebo);
@@ -201,6 +215,7 @@ int main()
 
 	layout(location = 0) in vec3 aPosition; // 顶点位置输入
 	layout(location = 1) in vec2 aTexCoord; // 纹理输入
+	layout(location = 2) in vec3 aNormal; // 法线
 
 	uniform mat4 uTransform;
 	uniform mat4 uProjection;
@@ -209,12 +224,18 @@ int main()
 	//GL_MAX_VERTEX_OUTPUT_COMPONENTS查询可以out的分量上限
 	// 本机可以传输 128个
 	out vec2 vTexCoord;
+	out vec3 vNormal;
 
 	void main()
 	{
 		gl_Position = uProjection* uView * uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
 		
 		vTexCoord = aTexCoord;
+
+		// 需要将模型局部空间的法线转换到世界空间，保证在模型发生变形后，法线依然垂直于表面
+		// 因为光源方向是世界空间中定义的，因此法线也要转换到世界空间，才能正确计算点积
+		mat3 normalMatrix = transpose(inverse(mat3(uTransform)));
+		vNormal = normalMatrix * aNormal;
 	}
 	)";
 
@@ -222,15 +243,37 @@ int main()
 	#version 330 core
 
 	in vec2 vTexCoord;
+	in vec3 vNormal;
 
 	uniform sampler2D uTexture;
+
+	uniform vec3 uToLightDirection;
+	uniform vec3 uLightColor;
+	uniform float uAmbientStrength;
 
 	out vec4 fragmentColor; // 输出颜色
 
 	void main()
 	{
 		// texture ：插值后的uv，在纹理中取色
-		fragmentColor = texture(uTexture, vTexCoord); 
+		vec4 baseColor = texture(uTexture, vTexCoord); 
+
+		vec3 normal = normalize(vNormal);
+		vec3 toLight = normalize(uToLightDirection);
+		
+		float diffuse = max(dot(normal, toLight), 0.0);
+	
+		// 环境光暂时使用白色
+		vec3 ambientLight = vec3(uAmbientStrength);
+		
+		// 漫反射使用光源颜色
+		vec3 diffuseLight = 0.8 * diffuse * uLightColor;
+
+		// 光照贡献可以叠加。例如一个表面同时被两盏灯照亮，可以分别计算每盏灯的贡献，再相加
+		fragmentColor = vec4(
+			baseColor.rgb * (ambientLight + diffuseLight), 
+			baseColor.a
+		);
 	}
 	)";
 
@@ -258,10 +301,40 @@ int main()
 		// 四个像素的纹理
 		// 黑 白
 		// 白 黑
-		const unsigned char pixels[] = {
+		const unsigned char fallbackPixels[] = {
 			0,0,0,255,  255,255,255,255,
 			255,255,255,255,  0,0,0,255
 		};
+
+		int textureWidth = 0;
+		int textureHeight = 0;
+		int originalChannels = 0;
+
+		// 图片通常是从顶部开始存储，翻转后对应当前的UV方向
+		stbi_set_flip_vertically_on_load(true);
+
+		//两个相邻的字符串会自动拼接为完整的路径
+		const char* texturePath = STARGATE_ASSET_DIR"/textures/crate.png";
+		// 解码图片，输出RGBA四个通道
+		unsigned char* imageData = stbi_load(
+			texturePath,
+			&textureWidth,
+			&textureHeight,
+			&originalChannels,
+			STBI_rgb_alpha
+		);
+
+		const unsigned char* pixels = imageData;
+		if (imageData == nullptr)
+		{
+			std::cerr << "Failed to load texture: " << texturePath
+				<< "\nReason : " << stbi_failure_reason()
+				<< std::endl;
+
+			textureWidth = 2;
+			textureHeight = 2;
+			pixels = fallbackPixels;
+		}
 
 		GLuint texture = 0;
 		glGenTextures(1, &texture);	//向 OpenGL 申请纹理编号，并把编号写进你提供的变量
@@ -274,26 +347,40 @@ int main()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
 		// 使用最近邻接采样，让棋盘格边界清晰
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // 缩小时使用mipmap  
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); //放大时使用线性过滤
 
 		// 创建纹理存储，并上传像素数据
 		glTexImage2D(
 			GL_TEXTURE_2D,				// 操作当前纹理单元上绑定的二维纹理
 			0,										// 定义的是mipmap第0层，即原始图像
 			GL_RGBA8,						// 纹理内部保存RGBA四个通道，每个通道8位
-			2, 2,									// 宽度和高度
+			textureWidth, textureHeight, // 宽度和高度
 			0,										// 历史遗留数据，必须选0
 			GL_RGBA,							// 输入数据中数据的通道顺序
 			GL_UNSIGNED_BYTE,		//输入数据中每个通道的数据类型
 			pixels
 		);
 
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		// 图片已经上传，释放stb_image分配的内存
+		if (imageData != nullptr)
+		{
+			stbi_image_free(imageData);
+		}
+
 		shader.Bind();
 		//采样器读取纹理单元编号0，对应GL_TEXTURE0，上面绑定的是texture这个纹理编号的数据
 		shader.SetInt("uTexture", 0);
 
 		// ------------------------创建纹理 END-----------------------------------------
+
+		// ------------------------光照信息-----------------------------------------
+		glm::vec3 toLightDirection(0.5f, 1.0f, 0.3f);
+		glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+		float ambientStrength = 0.2f;
+		// ------------------------光照信息 END-----------------------------------------
 
 		const bool timerResolutionEnabled = timeBeginPeriod(1) == TIMERR_NOERROR; // 设置系统定时器分辨率为1ms
 		lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
@@ -397,6 +484,20 @@ int main()
 				rotationAngle -= rotationStep; // 顺时针旋转
 			}
 
+			// 切换灯光颜色
+			if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+			{
+				lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 白光
+			}
+			else if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+			{
+				lightColor = glm::vec3(1.0f, 0.8f, 0.5f); // 暖色
+			}
+			else if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+			{
+				lightColor = glm::vec3(0.4f, 0.7f, 1.0f); // 冷色
+			}
+
 
 			float forward = 0.0f;
 			float right = 0.0f;
@@ -475,9 +576,13 @@ int main()
 			transform = glm::scale(transform, glm::vec3(scaleFactor));
 
 			shader.Bind();
+			shader.SetFloat("uAmbientStrength", ambientStrength);
+			shader.SetVec3("uToLightDirection", toLightDirection);
+			shader.SetVec3("uLightColor", lightColor);
 			shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
 			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
+			
 
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, texture);

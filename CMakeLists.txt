@@ -33,10 +33,19 @@ add_executable (StarGate
 	"src/Shader.cpp"
 	"src/Camera.h"
 	"src/Camera.cpp"
+	"src/StbImage.cpp"
+)
+
+# 资源文件目录，这样读取图片不依赖vs的目录
+target_compile_definitions(StarGate PRIVATE
+	STARGATE_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
 )
 
 # 再给这个目标设置头文件搜索目录
-target_include_directories(StarGate PRIVATE third_party/glm)
+target_include_directories(StarGate PRIVATE 
+	third_party/glm
+	third_party/stb
+)
 
 # 让 StarGate 使用 GLFW。
 target_link_libraries(StarGate PRIVATE glfw glad winmm opengl32)
