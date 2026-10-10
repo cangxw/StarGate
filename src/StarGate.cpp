@@ -17,6 +17,18 @@
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
+#include "Camera.h"
+
+struct InputState
+{
+	Camera* camera = nullptr;
+
+	float scaleFactor = 1.0f;
+
+	double lastMouseX = 0.0;
+	double lastMouseY = 0.0;
+	bool firstMouse = true;
+};
 
 int main()
 {
@@ -196,25 +208,57 @@ int main()
 		float rotationAngle = 30.0f; // 旋转角度初始值
 		const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
 
-		float scaleFactor = 1.0f; // 缩放因子初始值
-		glfwSetWindowUserPointer(window, &scaleFactor); // 将缩放因子指针存储在窗口的用户指针中
-		glfwSetScrollCallback(window,
+		Camera camera;
+		InputState inputState;
+		inputState.camera = &camera;
+
+		float& scaleFactor = inputState.scaleFactor;
+		glfwSetWindowUserPointer(window, &inputState); // 将缩放因子指针存储在窗口的用户指针中
+
+		glfwSetScrollCallback(
+			window,
 			[](GLFWwindow* window, double, double yoffset)
 			{
-				// 取回缩放变量的地址
-				float* scale = static_cast<float*>(glfwGetWindowUserPointer(window));
+				InputState* input = static_cast<InputState*>(
+					glfwGetWindowUserPointer(window)
+					);
 
-				*scale += static_cast<float>(yoffset) * 0.1f; // 根据滚轮滚动调整缩放因子
-				if (*scale < 0.1f) *scale = 0.1f; // 限制最小缩放因子
+				input->scaleFactor += static_cast<float>(yoffset) * 0.1f;
+
+				if (input->scaleFactor < 0.1f)
+				{
+					input->scaleFactor = 0.1f;
+				}
 			}
 		);
 
-		// 相机相关
-		glm::vec3 cameraPosition(0.0f, 0.0f, 3.0f); //摄像机位置
-		glm::vec3 cameraFront(0.0f, 0.0f, -1.0f);    // 观察方向
-		const glm::vec3 cameraUp(0.0f, 1.0f, 0.0f);// 摄像机向上的参考方向
+		// 隐藏光标
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		glfwSetCursorPosCallback(window,
+			[](GLFWwindow* window, double xpos, double ypos)
+			{
+				// 取回缩放变量的地址
+				InputState* input = static_cast<InputState*>(
+					glfwGetWindowUserPointer(window)
+					);
 
-		const float cameraSpeed = 2.5f; 
+				if (input->firstMouse)
+				{
+					input->lastMouseX = xpos;
+					input->lastMouseY = ypos;
+					input->firstMouse = false;
+					return;
+				}
+
+				const float offsetX = static_cast<float>(xpos - input->lastMouseX);
+				const float offsetY = static_cast<float>(input->lastMouseY - ypos);
+
+				input->lastMouseX = xpos;
+				input->lastMouseY = ypos;
+
+				input->camera->Rotate(offsetX, offsetY);
+			}
+		);
 
 		// 主循环
 		while (!glfwWindowShouldClose(window))
@@ -257,35 +301,31 @@ int main()
 				rotationAngle -= rotationStep; // 顺时针旋转
 			}
 
-			// 处理相机输入
-			const float cameraStep = cameraSpeed * static_cast<float>(deltaTime);
-			const glm::vec3 cameraRight = glm::normalize(glm::cross(cameraFront, cameraUp));
-			glm::vec3 movement(0.0f); //累计本帧的移动方向
+
+			float forward = 0.0f;
+			float right = 0.0f;
 
 			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 			{
-				movement += cameraFront;
+				forward += 1.0f;
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
 			{
-				movement -= cameraFront;
+				forward -= 1.0f;
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
 			{
-				movement -= cameraRight;
+				right -= 1.0f;
 			}
 
 			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 			{
-				movement += cameraRight;
+				right += 1.0f;
 			}
 
-			if (glm::length(movement) > 0.0f)
-			{
-				cameraPosition += glm::normalize(movement) * cameraStep;
-			}
+			camera.Move(forward, right, static_cast<float>(deltaTime));
 
 			// 渲染开始
 			// 获取实际绘图区域的宽度和高度
@@ -319,11 +359,7 @@ int main()
 			//	glm::vec3(0.0f, 0.0f, -3.0f) // 将相机向后移动3个单位，相当于003
 			//); // 视图矩阵，向后移动相机
 
-			const glm::mat4 view = glm::lookAt(
-				cameraPosition,							// 摄像机在哪里
-				cameraPosition + cameraFront,  // 摄像机看向哪个目标点
-				cameraUp									// 向上参考方向
-			);
+			const glm::mat4 view = camera.GetViewMatrix();
 
 			// 设置绘图区域
 			glViewport(0, 0, framebufferWidth, framebufferHeight);
@@ -397,6 +433,7 @@ int main()
 			timeEndPeriod(1); // 恢复系统定时器分辨率
 		}
 
+		glfwSetCursorPosCallback(window, nullptr);
 		glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
 		glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
 

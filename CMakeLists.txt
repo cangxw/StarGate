@@ -31,6 +31,8 @@ add_executable (StarGate
 	"src/StarGate.cpp"
  	"src/Shader.h"
 	"src/Shader.cpp"
+	"src/Camera.h"
+	"src/Camera.cpp"
 )
 
 # 再给这个目标设置头文件搜索目录
