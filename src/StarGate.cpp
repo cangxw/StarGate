@@ -222,11 +222,15 @@ int main()
 	#version 330 core
 
 	in vec2 vTexCoord;
+
+	uniform sampler2D uTexture;
+
 	out vec4 fragmentColor; // 输出颜色
 
 	void main()
 	{
-		fragmentColor = vec4(vTexCoord, 0.0, 1.0); 
+		// texture ：插值后的uv，在纹理中取色
+		fragmentColor = texture(uTexture, vTexCoord); 
 	}
 	)";
 
@@ -250,6 +254,46 @@ int main()
 			return -1;
 		}
 
+		// ------------------------创建纹理-----------------------------------------
+		// 四个像素的纹理
+		// 黑 白
+		// 白 黑
+		const unsigned char pixels[] = {
+			0,0,0,255,  255,255,255,255,
+			255,255,255,255,  0,0,0,255
+		};
+
+		GLuint texture = 0;
+		glGenTextures(1, &texture);	//向 OpenGL 申请纹理编号，并把编号写进你提供的变量
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, texture); //首次绑定时建立二维纹理对象，并选中它供后续操作
+
+		// 当UV超出0-1的时候，重复纹理
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+		// 使用最近邻接采样，让棋盘格边界清晰
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		// 创建纹理存储，并上传像素数据
+		glTexImage2D(
+			GL_TEXTURE_2D,				// 操作当前纹理单元上绑定的二维纹理
+			0,										// 定义的是mipmap第0层，即原始图像
+			GL_RGBA8,						// 纹理内部保存RGBA四个通道，每个通道8位
+			2, 2,									// 宽度和高度
+			0,										// 历史遗留数据，必须选0
+			GL_RGBA,							// 输入数据中数据的通道顺序
+			GL_UNSIGNED_BYTE,		//输入数据中每个通道的数据类型
+			pixels
+		);
+
+		shader.Bind();
+		//采样器读取纹理单元编号0，对应GL_TEXTURE0，上面绑定的是texture这个纹理编号的数据
+		shader.SetInt("uTexture", 0);
+
+		// ------------------------创建纹理 END-----------------------------------------
 
 		const bool timerResolutionEnabled = timeBeginPeriod(1) == TIMERR_NOERROR; // 设置系统定时器分辨率为1ms
 		lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
@@ -435,6 +479,9 @@ int main()
 			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, texture);
+
 			glBindVertexArray(vao);
 			//glDrawArrays(GL_TRIANGLES, 0, 36); // 从第0个顶点开始，使用3个顶点绘制一个三角形
 			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr); // 用索引绘制，这一步开始执行顶点着色器
@@ -490,6 +537,7 @@ int main()
 		glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
 
 		// 释放VBO
+		glDeleteTextures(1, &texture);
 		glDeleteVertexArrays(1, &vao);
 		glDeleteBuffers(1, &vbo);
 		glDeleteBuffers(1, &ebo);

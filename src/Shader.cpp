@@ -111,6 +111,22 @@ bool Shader::IsValid() const
 	return m_ProgramID != 0;
 }
 
+void Shader::SetInt(const char* name, int value) const
+{
+	if (m_ProgramID != 0)
+	{
+		const GLint location = glGetUniformLocation(m_ProgramID, name);
+		if (location != -1)
+		{
+			glUniform1i(location, value);
+		}
+		else
+		{
+			std::cerr << "Warning: Uniform '" << name << "' not found in shader program." << std::endl;
+		}
+	}
+}
+
 void Shader::SetFloat(const char* name, float value) const
 {
 	if (m_ProgramID != 0)

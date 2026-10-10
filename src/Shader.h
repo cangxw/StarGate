@@ -16,6 +16,8 @@ public:
 	void Bind() const;
 	// 检查创建是否成功
 	bool IsValid() const;
+	// 设置int变量的值
+	void SetInt(const char* name, int value) const;
 	// 设置float变量的值
 	void SetFloat(const char* name, float value) const;
 	// 设置4x4矩阵变量的值
