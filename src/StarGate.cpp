@@ -97,24 +97,52 @@ int main()
 
 	// 绘制立方体
 	const float vertices[] = {
-		// X      Y      Z
-		-0.5f, -0.5f, -0.5f, // 0
-		 0.5f, -0.5f, -0.5f, // 1
-		 0.5f,  0.5f, -0.5f, // 2
-		-0.5f,  0.5f, -0.5f, // 3
-		-0.5f, -0.5f,  0.5f, // 4
-		 0.5f, -0.5f,  0.5f, // 5
-		 0.5f,  0.5f,  0.5f, // 6
-		-0.5f,  0.5f,  0.5f  // 7
+		// X      Y      Z       U     V
+
+		// 后面：0～3
+		 0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
+		-0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
+		-0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
+		 0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+
+		 // 前面：4～7
+		 -0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
+		  0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
+		  0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
+		 -0.5f,  0.5f,  0.5f,   0.0f, 1.0f,
+
+		 // 左面：8～11
+		 -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
+		 -0.5f, -0.5f,  0.5f,   1.0f, 0.0f,
+		 -0.5f,  0.5f,  0.5f,   1.0f, 1.0f,
+		 -0.5f,  0.5f, -0.5f,   0.0f, 1.0f,
+
+		 // 右面：12～15
+		  0.5f, -0.5f,  0.5f,   0.0f, 0.0f,
+		  0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
+		  0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
+		  0.5f,  0.5f,  0.5f,   0.0f, 1.0f,
+
+		  // 底面：16～19
+		  -0.5f, -0.5f, -0.5f,   0.0f, 0.0f,
+		   0.5f, -0.5f, -0.5f,   1.0f, 0.0f,
+		   0.5f, -0.5f,  0.5f,   1.0f, 1.0f,
+		  -0.5f, -0.5f,  0.5f,   0.0f, 1.0f,
+
+		  // 顶面：20～23
+		  -0.5f,  0.5f,  0.5f,   0.0f, 0.0f,
+		   0.5f,  0.5f,  0.5f,   1.0f, 0.0f,
+		   0.5f,  0.5f, -0.5f,   1.0f, 1.0f,
+		  -0.5f,  0.5f, -0.5f,   0.0f, 1.0f
 	};
 
 	const unsigned int indices[] = {
-		0, 3, 2,  2, 1, 0, // 后面
-		4, 5, 6,  6, 7, 4, // 前面
-		0, 4, 7,  7, 3, 0, // 左面
-		1, 2, 6,  6, 5, 1, // 右面
-		0, 1, 5,  5, 4, 0, // 底面
-		3, 7, 6,  6, 2, 3  // 顶面
+		 0,  1,  2,   2,  3,  0,  
+		 4,  5,  6,   6,  7,  4,
+		 8,  9, 10,  10, 11,  8,
+		12, 13, 14,  14, 15, 12,
+		16, 17, 18,  18, 19, 16,
+		20, 21, 22,  22, 23, 20
 	};
 
 	// 创建并绑定顶点数组对象（VAO）
@@ -127,7 +155,8 @@ int main()
 	glGenBuffers(1, &vbo);  // 生成一个缓冲对象编号，并写入vbo
 	// 将这个缓冲对象绑定为当前的顶点缓冲区
 	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	// 创建数据存储，并复制verticess中的数据
+
+	// 创建数据存储，并复制verticess中的数据，把数据从CPU内存搬到GPU缓存区
 	// GL_ARRAY_BUFFER 操作当前绑定的顶点缓冲对象
 	// 这里使用GL_STATIC_DRAW表示数据不会频繁修改，适合静态数据
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -138,12 +167,25 @@ int main()
 		3,							// 每个顶点属性的分量数量，这里是3个（x, y, z）
 		GL_FLOAT,			// 数据类型
 		GL_FALSE,			// 是否归一化
-		3 * sizeof(float),	// 步长（每个顶点的字节数）
+		5 * sizeof(float),	// 步长（每个顶点的字节数）
 		nullptr					// 从缓冲区的第0个字节开始读取数据
 	);
 
 	// 启用编号为0的顶点属性数组
 	glEnableVertexAttribArray(0); 
+
+	//属性1 UV，跳过为止的三个float
+	glVertexAttribPointer(
+		1,
+		2,
+		GL_FLOAT,
+		GL_FALSE,
+		5 * sizeof(float),
+		reinterpret_cast<const void*>(3 * sizeof(float))
+	);
+
+	// 启用编号为1的顶点属性数组
+	glEnableVertexAttribArray(1);
 
 	GLuint ebo = 0;
 	glGenBuffers(1, &ebo);
@@ -158,31 +200,41 @@ int main()
 	#version 330 core
 
 	layout(location = 0) in vec3 aPosition; // 顶点位置输入
+	layout(location = 1) in vec2 aTexCoord; // 纹理输入
 
 	uniform mat4 uTransform;
 	uniform mat4 uProjection;
 	uniform mat4 uView;
 
-	out vec3 vertexColor;
+	//GL_MAX_VERTEX_OUTPUT_COMPONENTS查询可以out的分量上限
+	// 本机可以传输 128个
+	out vec2 vTexCoord;
 
 	void main()
 	{
 		gl_Position = uProjection* uView * uTransform * vec4(aPosition, 1.0); // 将顶点位置传递给裁剪空间
-		vertexColor = aPosition + vec3(0.5);
+		
+		vTexCoord = aTexCoord;
 	}
 	)";
 
 	const char* fragmentShaderSource = R"(
 	#version 330 core
 
-	in vec3 vertexColor;
+	in vec2 vTexCoord;
 	out vec4 fragmentColor; // 输出颜色
 
 	void main()
 	{
-		fragmentColor = vec4(vertexColor, 1.0); // 设置输出颜色为橙色
+		fragmentColor = vec4(vTexCoord, 0.0, 1.0); 
 	}
 	)";
+
+	//GLint maxComponents = 0;
+	//glGetIntegerv(GL_MAX_VERTEX_OUTPUT_COMPONENTS, &maxComponents);
+
+	//std::cout << "Max vertex output components: "  --> 128个
+	//	<< maxComponents << std::endl;
 
 	{
 		Shader shader(vertexShaderSource, fragmentShaderSource);
@@ -385,7 +437,7 @@ int main()
 
 			glBindVertexArray(vao);
 			//glDrawArrays(GL_TRIANGLES, 0, 36); // 从第0个顶点开始，使用3个顶点绘制一个三角形
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr); // 用索引绘制
+			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr); // 用索引绘制，这一步开始执行顶点着色器
 			glBindVertexArray(0); // 绘制完成后，解绑VAO，避免后续操作意外修改它
 
 			// 把这一帧的渲染结果显示到屏幕上
