@@ -19,6 +19,7 @@
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
 #include "Camera.h"
+#include "Mesh.h"
 
 struct InputState
 {
@@ -146,69 +147,6 @@ int main()
 		20, 21, 22,  22, 23, 20
 	};
 
-	// 创建并绑定顶点数组对象（VAO）
-	GLuint vao = 0;
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	// 创建顶点缓冲对象（VBO
-	GLuint vbo = 0; // vbo保存的是对象编号
-	glGenBuffers(1, &vbo);  // 生成一个缓冲对象编号，并写入vbo
-	// 将这个缓冲对象绑定为当前的顶点缓冲区
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-
-	// 创建数据存储，并复制verticess中的数据，把数据从CPU内存搬到GPU缓存区
-	// GL_ARRAY_BUFFER 操作当前绑定的顶点缓冲对象
-	// 这里使用GL_STATIC_DRAW表示数据不会频繁修改，适合静态数据
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	//描述位置属性的数据读取方式
-	glVertexAttribPointer(
-		0,							// 属性编号，之后对应着色器的位置输入
-		3,							// 每个顶点属性的分量数量，这里是3个（x, y, z）
-		GL_FLOAT,			// 数据类型
-		GL_FALSE,			// 是否归一化
-		8 * sizeof(float),	// 步长（每个顶点的字节数）
-		nullptr					// 从缓冲区的第0个字节开始读取数据
-	);
-
-	// 启用编号为0的顶点属性数组
-	glEnableVertexAttribArray(0); 
-
-	//属性1 UV，跳过为止的三个float
-	glVertexAttribPointer(
-		1,
-		2,
-		GL_FLOAT,
-		GL_FALSE,
-		8 * sizeof(float),
-		reinterpret_cast<const void*>(3 * sizeof(float))
-	);
-
-	// 启用编号为1的顶点属性数组
-	glEnableVertexAttribArray(1);
-
-	//属性2 ：法线方向，跳过位置和UV五个float
-	glVertexAttribPointer(
-		2,
-		3,
-		GL_FLOAT,
-		GL_FALSE,
-		8 * sizeof(float),
-		reinterpret_cast<const void*>(5 * sizeof(float))
-	);
-
-	// 启用编号为2的顶点属性数组
-	glEnableVertexAttribArray(2);
-
-	GLuint ebo = 0;
-	glGenBuffers(1, &ebo);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-	// 设置完成，取消当前VAO的绑定，避免后续操作意外修改它
-	glBindVertexArray(0);
-
 	// Shader source code
 	const char* vertexShaderSource = R"(
 	#version 330 core
@@ -317,13 +255,16 @@ int main()
 		{
 			std::cerr << "Failed to create shader program" << std::endl;
 
-			glDeleteVertexArrays(1, &vao);
-			glDeleteBuffers(1, &vbo);
-			glDeleteBuffers(1, &ebo);
 			glfwDestroyWindow(window);
 			glfwTerminate();
 			return -1;
 		}
+
+		// 创建立方体
+		// 数组总字节数 / 一个元素的字节数 = 索引个数
+		const GLsizei indexCount = static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
+
+		Mesh cubeMesh(vertices, sizeof(vertices), indices, indexCount);
 
 		// ------------------------创建纹理-----------------------------------------
 		// 四个像素的纹理
@@ -618,10 +559,7 @@ int main()
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, texture);
 
-			glBindVertexArray(vao);
-			//glDrawArrays(GL_TRIANGLES, 0, 36); // 从第0个顶点开始，使用3个顶点绘制一个三角形
-			glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, nullptr); // 用索引绘制，这一步开始执行顶点着色器
-			glBindVertexArray(0); // 绘制完成后，解绑VAO，避免后续操作意外修改它
+			cubeMesh.Draw();
 
 			// 把这一帧的渲染结果显示到屏幕上
 			glfwSwapBuffers(window);
@@ -674,9 +612,6 @@ int main()
 
 		// 释放VBO
 		glDeleteTextures(1, &texture);
-		glDeleteVertexArrays(1, &vao);
-		glDeleteBuffers(1, &vbo);
-		glDeleteBuffers(1, &ebo);
 	}
 	// Shader已经释放，现在销毁OpenGL Context
 	glfwDestroyWindow(window);
