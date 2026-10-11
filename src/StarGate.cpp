@@ -245,6 +245,12 @@ int main()
 			}
 		);
 
+		const glm::vec3 cubePositions[] = {
+			glm::vec3(-1.5f, 0.0f, -1.0f),
+			glm::vec3(0.0f, 0.0f, 0.0f),
+			glm::vec3(1.5f, 0.0f, -1.0f)
+		};
+
 		// 主循环
 		while (!glfwWindowShouldClose(window))
 		{
@@ -366,31 +372,34 @@ int main()
 			// 用前面的颜色清除屏幕 包括深度缓存
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-			// 选择着色器程序和顶点读取配置
-			glm::mat4 transform(1.0f); // 初始化为单位矩阵
-			transform = glm::translate(transform, glm::vec3(offsetX, 0, 0));
-			//glm::radians(rotationAngle) 将角度转换为弧度，因为glm::rotate函数需要弧度值
-			// glm::vec3(0, 0, 1) 表示绕Z轴旋转，这里假设三角形在XY平面上
-			transform = glm::rotate(transform, glm::radians(rotationAngle), glm::vec3(0, 1, 0));
-
-			// 稍微倾斜一点，让顶部看见
-			transform = glm::rotate(transform, glm::radians(20.0f), glm::vec3(1, 0, 0));
-			transform = glm::scale(transform, glm::vec3(scaleFactor));
-
 			shader.Bind();
 			shader.SetFloat("uAmbientStrength", ambientStrength);
 			shader.SetFloat("uSpecularStrength", 1.0f);
 			shader.SetFloat("uShininess", 128.0f);
+
 			shader.SetVec3("uToLightDirection", toLightDirection);
 			shader.SetVec3("uLightColor", lightColor);
 			shader.SetVec3("uCameraPosition", camera.GetPosition());
-			shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
+
 			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 			
-
 			texture.Bind();
-			cubeMesh.Draw();
+			for (const glm::vec3& position : cubePositions)
+			{
+				glm::mat4 transform(1.0f);
+
+				transform = glm::translate(transform, position + glm::vec3(offsetX, 0.0f, 0.0f));
+				transform = glm::rotate(transform, glm::radians(rotationAngle),
+					glm::vec3(0.0f, 1.0f, 0.0f));
+				//glm::radians(rotationAngle) 将角度转换为弧度，因为glm::rotate函数需要弧度值
+				// glm::vec3(0, 0, 1) 表示绕Z轴旋转，这里假设三角形在XY平面上
+				transform = glm::rotate(transform, glm::radians(20.0f), glm::vec3(1, 0, 0));
+				transform = glm::scale(transform, glm::vec3(scaleFactor));
+
+				shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
+				cubeMesh.Draw();
+			}
 
 			// 把这一帧的渲染结果显示到屏幕上
 			glfwSwapBuffers(window);
