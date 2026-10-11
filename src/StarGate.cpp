@@ -17,6 +17,10 @@
 #include <assimp/version.h>
 #include <limits>
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
 #include "Camera.h"
@@ -64,6 +68,7 @@ int main()
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
 
 	GLFWwindow* window = glfwCreateWindow(
 		1280, 720, "StarGate", nullptr, nullptr);
@@ -182,7 +187,7 @@ int main()
 		);
 
 		// 隐藏光标
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		glfwSetCursorPosCallback(window,
 			[](GLFWwindow* window, double xpos, double ypos)
 			{
@@ -223,6 +228,32 @@ int main()
 		cubeObjects[2].position = glm::vec3(1.5f, 0.0f, -1.0f);
 		cubeObjects[2].rotation = glm::vec3(0.0f, -25.0f, 15.0f);
 		cubeObjects[2].scale = glm::vec3(0.8f);
+
+		// 显示鼠标
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+		// 暂时停用原来的鼠标转向和滚轮缩放
+		glfwSetCursorPosCallback(window, nullptr);
+		glfwSetScrollCallback(window, nullptr);
+
+		// 创建Imgui上下文
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+
+		//使用深色的界面
+		ImGui::StyleColorsDark();
+
+		//DPI的适配
+		// 获取窗体所在屏幕的显示缩放比例
+		const float uiScale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
+
+		ImGuiStyle& style = ImGui::GetStyle();
+		style.ScaleAllSizes(uiScale);	// 空间间距，边距等尺寸
+		style.FontScaleDpi = uiScale;	// 字体大小
+
+		//连接GLFW和OPENGL后端
+		ImGui_ImplGlfw_InitForOpenGL(window, true);
+		ImGui_ImplOpenGL3_Init("#version 330 core");
 
 		// 主循环
 		while (!glfwWindowShouldClose(window))
@@ -319,6 +350,15 @@ int main()
 				continue;
 			}
 
+			// 开始新的一帧
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			// 官方测试窗口
+			//此时只是生成界面，实际绘制放在后面。
+			ImGui::ShowDemoWindow();
+
 			const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
 			// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
 			//const glm::mat4 projection = glm::ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f);
@@ -378,6 +418,12 @@ int main()
 				model.Draw(shader);
 			}
 
+			// 整理界面绘制顺序
+			ImGui::Render();
+
+			//绘制在3维场景上方
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
 			// 把这一帧的渲染结果显示到屏幕上
 			glfwSwapBuffers(window);
 			// 渲染结束
@@ -422,6 +468,10 @@ int main()
 		{
 			timeEndPeriod(1); // 恢复系统定时器分辨率
 		}
+
+		ImGui_ImplOpenGL3_Shutdown();
+		ImGui_ImplGlfw_Shutdown();
+		ImGui::DestroyContext();
 
 		glfwSetCursorPosCallback(window, nullptr);
 		glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
