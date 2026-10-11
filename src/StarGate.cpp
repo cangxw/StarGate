@@ -14,12 +14,12 @@
 #include <mmsystem.h> // Windows 定时器接口
 #include <glm/glm.hpp> // 用于矩阵和向量操作
 #include <glm/gtc/matrix_transform.hpp> // 用于矩阵变换
-#include <stb_image.h>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
 #include "Camera.h"
 #include "Mesh.h"
+#include "Texture2D.h"
 
 struct InputState
 {
@@ -174,83 +174,9 @@ int main()
 		Mesh cubeMesh(vertices, sizeof(vertices), indices, indexCount);
 
 		// ------------------------创建纹理-----------------------------------------
-		// 四个像素的纹理
-		// 黑 白
-		// 白 黑
-		const unsigned char fallbackPixels[] = {
-			0,0,0,255,  255,255,255,255,
-			255,255,255,255,  0,0,0,255
-		};
-
-		int textureWidth = 0;
-		int textureHeight = 0;
-		int originalChannels = 0;
-
-		// 图片通常是从顶部开始存储，翻转后对应当前的UV方向
-		stbi_set_flip_vertically_on_load(true);
-
-		//两个相邻的字符串会自动拼接为完整的路径
-		const char* texturePath = STARGATE_ASSET_DIR"/textures/crate.png";
-		// 解码图片，输出RGBA四个通道
-		unsigned char* imageData = stbi_load(
-			texturePath,
-			&textureWidth,
-			&textureHeight,
-			&originalChannels,
-			STBI_rgb_alpha
-		);
-
-		const unsigned char* pixels = imageData;
-		if (imageData == nullptr)
-		{
-			std::cerr << "Failed to load texture: " << texturePath
-				<< "\nReason : " << stbi_failure_reason()
-				<< std::endl;
-
-			textureWidth = 2;
-			textureHeight = 2;
-			pixels = fallbackPixels;
-		}
-
-		GLuint texture = 0;
-		glGenTextures(1, &texture);	//向 OpenGL 申请纹理编号，并把编号写进你提供的变量
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, texture); //首次绑定时建立二维纹理对象，并选中它供后续操作
-
-		// 当UV超出0-1的时候，重复纹理
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-		// 使用最近邻接采样，让棋盘格边界清晰
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR); // 缩小时使用mipmap  
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); //放大时使用线性过滤
-
-		// 创建纹理存储，并上传像素数据
-		glTexImage2D(
-			GL_TEXTURE_2D,				// 操作当前纹理单元上绑定的二维纹理
-			0,										// 定义的是mipmap第0层，即原始图像
-			GL_RGBA8,						// 纹理内部保存RGBA四个通道，每个通道8位
-			textureWidth, textureHeight, // 宽度和高度
-			0,										// 历史遗留数据，必须选0
-			GL_RGBA,							// 输入数据中数据的通道顺序
-			GL_UNSIGNED_BYTE,		//输入数据中每个通道的数据类型
-			pixels
-		);
-
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		// 图片已经上传，释放stb_image分配的内存
-		if (imageData != nullptr)
-		{
-			stbi_image_free(imageData);
-		}
-
+		Texture2D texture(STARGATE_ASSET_DIR "/textures/crate.png");
 		shader.Bind();
-		//采样器读取纹理单元编号0，对应GL_TEXTURE0，上面绑定的是texture这个纹理编号的数据
 		shader.SetInt("uTexture", 0);
-
-		// ------------------------创建纹理 END-----------------------------------------
 
 		// ------------------------光照信息-----------------------------------------
 		glm::vec3 toLightDirection(0.0f, 0.0f, 1.0f);
@@ -463,9 +389,7 @@ int main()
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 			
 
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, texture);
-
+			texture.Bind();
 			cubeMesh.Draw();
 
 			// 把这一帧的渲染结果显示到屏幕上
@@ -516,9 +440,6 @@ int main()
 		glfwSetCursorPosCallback(window, nullptr);
 		glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
 		glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
-
-		// 释放VBO
-		glDeleteTextures(1, &texture);
 	}
 	// Shader已经释放，现在销毁OpenGL Context
 	glfwDestroyWindow(window);
