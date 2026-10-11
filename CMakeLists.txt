@@ -49,6 +49,24 @@ add_library(glad STATIC third_party/glad/src/gl.c)
 # 提供头文件搜索目录
 target_include_directories(glad PUBLIC third_party/glad/include)
 
+# Dear ImGui 核心与 GLFW/OpenGL 后端
+add_library(imgui STATIC
+    third_party/imgui/imgui.cpp
+    third_party/imgui/imgui_draw.cpp
+    third_party/imgui/imgui_tables.cpp
+    third_party/imgui/imgui_widgets.cpp
+    third_party/imgui/imgui_demo.cpp
+    third_party/imgui/backends/imgui_impl_glfw.cpp
+    third_party/imgui/backends/imgui_impl_opengl3.cpp
+)
+
+target_include_directories(imgui PUBLIC
+    third_party/imgui
+    third_party/imgui/backends
+)
+
+target_link_libraries(imgui PUBLIC glfw)
+
 # 将源代码添加到此项目的可执行文件。
 add_executable (StarGate 
 	"src/StarGate.cpp"
@@ -84,6 +102,7 @@ target_include_directories(StarGate PRIVATE
 target_link_libraries(StarGate PRIVATE 
 	glfw 
 	glad 
+	imgui
 	winmm 
 	opengl32
 	assimp::assimp)
