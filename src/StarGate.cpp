@@ -20,6 +20,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <glm/gtc/type_ptr.hpp>	//这个头文件提供 glm::value_ptr()，用来取得 GLM 向量或矩阵内部数据的指针
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -276,65 +277,67 @@ int main()
 				glfwSetWindowShouldClose(window, GLFW_TRUE);
 			}
 
-			if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+			if (!ImGui::GetIO().WantCaptureKeyboard)
 			{
-				offsetX -= moveDistance;
-			}
+				if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+				{
+					offsetX -= moveDistance;
+				}
 
-			if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-			{
-				offsetX += moveDistance;
-			}
+				if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+				{
+					offsetX += moveDistance;
+				}
 
-			const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
-			if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-			{
-				rotationAngle += rotationStep; // 逆时针旋转
-			}
-			if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-			{
-				rotationAngle -= rotationStep; // 顺时针旋转
-			}
+				const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
+				if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+				{
+					rotationAngle += rotationStep; // 逆时针旋转
+				}
+				if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+				{
+					rotationAngle -= rotationStep; // 顺时针旋转
+				}
 
-			// 切换灯光颜色
-			if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
-			{
-				lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 白光
-			}
-			else if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
-			{
-				lightColor = glm::vec3(1.0f, 0.8f, 0.5f); // 暖色
-			}
-			else if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
-			{
-				lightColor = glm::vec3(0.4f, 0.7f, 1.0f); // 冷色
-			}
+				// 切换灯光颜色
+				if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+				{
+					lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 白光
+				}
+				else if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+				{
+					lightColor = glm::vec3(1.0f, 0.8f, 0.5f); // 暖色
+				}
+				else if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+				{
+					lightColor = glm::vec3(0.4f, 0.7f, 1.0f); // 冷色
+				}
 
+				float forward = 0.0f;
+				float right = 0.0f;
 
-			float forward = 0.0f;
-			float right = 0.0f;
+				if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+				{
+					forward += 1.0f;
+				}
 
-			if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-			{
-				forward += 1.0f;
+				if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+				{
+					forward -= 1.0f;
+				}
+
+				if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+				{
+					right -= 1.0f;
+				}
+
+				if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+				{
+					right += 1.0f;
+				}
+
+				camera.Move(forward, right, static_cast<float>(deltaTime));
 			}
-
-			if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-			{
-				forward -= 1.0f;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-			{
-				right -= 1.0f;
-			}
-
-			if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-			{
-				right += 1.0f;
-			}
-
-			camera.Move(forward, right, static_cast<float>(deltaTime));
 
 			// 渲染开始
 			// 获取实际绘图区域的宽度和高度
@@ -355,9 +358,40 @@ int main()
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-			// 官方测试窗口
 			//此时只是生成界面，实际绘制放在后面。
-			ImGui::ShowDemoWindow();
+			//ImGui::ShowDemoWindow();
+			ImGui::SetNextWindowSize(
+				ImVec2(360.0f * uiScale, 420.0f * uiScale),
+				ImGuiCond_Once
+			);
+
+			if (ImGui::Begin("Inspector"))
+			{
+				ImGui::Text("Middle Object");
+
+				ImGui::SliderFloat("Position X", &offsetX, -3.0f, 3.0f);
+
+				ImGui::SliderFloat("Rotation Y", &rotationAngle, -180.0f, 180.0f);
+
+				ImGui::SliderFloat("Scale", &scaleFactor, 0.1f, 3.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+
+				if (ImGui::Button("Reset Object"))
+				{
+					offsetX = 0.0f;
+					rotationAngle = 0.0f;
+					scaleFactor = 1.0f;
+				}
+
+				ImGui::Separator();
+				ImGui::Text("Lighting");
+
+				ImGui::ColorEdit3("Light Color", glm::value_ptr(lightColor));
+				ImGui::SliderFloat("Ambient", &ambientStrength, 0.0f, 1.0f);
+
+				ImGui::Separator();
+				ImGui::Text("FPS:%.1f", ImGui::GetIO().Framerate);
+			}
+			ImGui::End();
 
 			const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
 			// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
