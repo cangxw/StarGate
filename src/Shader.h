@@ -7,7 +7,7 @@ class Shader
 {
 public:
 	// 创建着色器程序
-	Shader(const char* vertexSource, const char* fragmentSource);
+	Shader(const char* vertexPath, const char* fragmentPath);
 	// 对象销毁时释放着色器程序
 	~Shader();
 

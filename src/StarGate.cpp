@@ -147,102 +147,6 @@ int main()
 		20, 21, 22,  22, 23, 20
 	};
 
-	// Shader source code
-	const char* vertexShaderSource = R"(
-	#version 330 core
-
-	layout(location = 0) in vec3 aPosition; // 顶点位置输入
-	layout(location = 1) in vec2 aTexCoord; // 纹理输入
-	layout(location = 2) in vec3 aNormal; // 法线
-
-	uniform mat4 uTransform;
-	uniform mat4 uProjection;
-	uniform mat4 uView;
-
-	//GL_MAX_VERTEX_OUTPUT_COMPONENTS查询可以out的分量上限
-	// 本机可以传输 128个
-	out vec2 vTexCoord;
-	out vec3 vNormal;
-	out vec3 vWorldPosition;
-
-	void main()
-	{
-		vec4 worldPosition = uTransform * vec4(aPosition, 1.0);
-		gl_Position = uProjection* uView * worldPosition; // 将顶点位置传递给裁剪空间
-		
-		vWorldPosition = worldPosition.xyz;
-		vTexCoord = aTexCoord;
-
-		// 需要将模型局部空间的法线转换到世界空间，保证在模型发生变形后，法线依然垂直于表面
-		// 因为光源方向是世界空间中定义的，因此法线也要转换到世界空间，才能正确计算点积
-		mat3 normalMatrix = transpose(inverse(mat3(uTransform)));
-		vNormal = normalMatrix * aNormal;
-	}
-	)";
-
-	const char* fragmentShaderSource = R"(
-	#version 330 core
-
-	in vec2 vTexCoord;
-	in vec3 vNormal;
-	in vec3 vWorldPosition;
-
-	uniform sampler2D uTexture;
-
-	uniform vec3 uToLightDirection;
-	uniform vec3 uLightColor;
-	uniform float uAmbientStrength;
-	uniform vec3 uCameraPosition;
-	uniform float uSpecularStrength;
-	uniform float uShininess;
-
-	out vec4 fragmentColor; // 输出颜色
-
-	void main()
-	{
-		// texture ：插值后的uv，在纹理中取色
-		vec4 baseColor = texture(uTexture, vTexCoord); 
-
-		vec3 normal = normalize(vNormal);
-		vec3 toLight = normalize(uToLightDirection);
-		
-		float diffuse = max(dot(normal, toLight), 0.0);
-	
-		// 环境光暂时使用白色
-		vec3 ambientLight = vec3(uAmbientStrength);
-		
-		// 漫反射使用光源颜色
-		vec3 diffuseLight = 0.8 * diffuse * uLightColor;
-
-		// 高光部分
-		// 从表面指向相机	
-		vec3 toCamera = normalize(uCameraPosition - vWorldPosition);
-		// 光线照射到表面后 反射的方向 Phong模型比较相机方向和反射方向的夹角大小
-		// vec3 reflectedDirection = reflect(-toLight, normal);
-
-		float specular = 0.0;
-		// 光源位于表面正面时，才计算高光
-		if(diffuse > 0.0)
-		{
-			// 半程向量，Blinn-Phong模型比较半程和法线的夹角
-			vec3 halfwayDirection = normalize(toLight + toCamera);
-
-			specular = pow(
-				max(dot(normal, halfwayDirection), 0.0),
-				uShininess
-			);
-		}
-
-		vec3 specularLight = uSpecularStrength * specular * uLightColor;
-
-		// 光照贡献可以叠加。例如一个表面同时被两盏灯照亮，可以分别计算每盏灯的贡献，再相加
-		fragmentColor = vec4(
-			baseColor.rgb * (ambientLight + diffuseLight) + specularLight, 
-			baseColor.a
-		);
-	}
-	)";
-
 	//GLint maxComponents = 0;
 	//glGetIntegerv(GL_MAX_VERTEX_OUTPUT_COMPONENTS, &maxComponents);
 
@@ -250,7 +154,10 @@ int main()
 	//	<< maxComponents << std::endl;
 
 	{
-		Shader shader(vertexShaderSource, fragmentShaderSource);
+		Shader shader(
+			STARGATE_ASSET_DIR "/shaders/lit.vert",
+			STARGATE_ASSET_DIR "/shaders/lit.frag"
+		);
 		if (!shader.IsValid())
 		{
 			std::cerr << "Failed to create shader program" << std::endl;

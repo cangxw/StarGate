@@ -2,6 +2,39 @@
 #include <iostream>
 #include <glm/gtc/type_ptr.hpp> // 用于将glm::mat4转换为float数组
 
+#include <fstream>
+#include <sstream>
+#include <string>
+
+static bool ReadShaderFile(const char* path, std::string& source)
+{
+	std::ifstream file(path);
+
+	if (!file.is_open())
+	{
+		std::cerr << "Failed to open shader file: " << path << std::endl;
+		return false;
+	}
+
+	std::ostringstream buffer;
+	buffer << file.rdbuf();
+
+	if (file.bad())
+	{
+		std::cerr << "Failed to read shader file: " << path << std::endl;
+		return false;
+	}
+
+	source = buffer.str();
+	if (source.empty())
+	{
+		std::cerr << "Shader file is empty: " << path << std::endl;
+		return false;
+	}
+
+	return true;
+}
+
 static GLuint CompileShader(GLenum type, const char* source)
 {	
 	// 创建一个新的着色器对象，返回一个唯一的标识符（GLuint类型），用于后续的着色器操作
@@ -38,15 +71,25 @@ static GLuint CompileShader(GLenum type, const char* source)
 }
 
 // Shader类的构造函数，接受顶点着色器和片段着色器的源代码
-Shader::Shader(const char* vertexSource, const char* fragmentSource)
+Shader::Shader(const char* vertexPath, const char* fragmentPath)
 {
-	const GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource);
+	std::string vertexSource;
+	std::string fragmentSource;
+
+	if (!ReadShaderFile(vertexPath, vertexSource))
+		return;
+
+	if (!ReadShaderFile(fragmentPath, fragmentSource))
+		return;
+
+
+	const GLuint vertexShader = CompileShader(GL_VERTEX_SHADER, vertexSource.c_str());
 	if (vertexShader == 0)
 	{
 		return;
 	}
 
-	const GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource);
+	const GLuint fragmentShader = CompileShader(GL_FRAGMENT_SHADER, fragmentSource.c_str());
 	if (fragmentShader == 0)
 	{
 		glDeleteShader(vertexShader);
