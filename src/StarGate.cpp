@@ -37,6 +37,7 @@ struct InputState
 	double lastMouseX = 0.0;
 	double lastMouseY = 0.0;
 	bool firstMouse = true;
+	bool cameraControlActive = false;
 };
 
 int main()
@@ -170,22 +171,22 @@ int main()
 		float& scaleFactor = inputState.scaleFactor;
 		glfwSetWindowUserPointer(window, &inputState); // 将缩放因子指针存储在窗口的用户指针中
 
-		glfwSetScrollCallback(
-			window,
-			[](GLFWwindow* window, double, double yoffset)
-			{
-				InputState* input = static_cast<InputState*>(
-					glfwGetWindowUserPointer(window)
-					);
+		//glfwSetScrollCallback(
+		//	window,
+		//	[](GLFWwindow* window, double, double yoffset)
+		//	{
+		//		InputState* input = static_cast<InputState*>(
+		//			glfwGetWindowUserPointer(window)
+		//			);
 
-				input->scaleFactor += static_cast<float>(yoffset) * 0.1f;
+		//		input->scaleFactor += static_cast<float>(yoffset) * 0.1f;
 
-				if (input->scaleFactor < 0.1f)
-				{
-					input->scaleFactor = 0.1f;
-				}
-			}
-		);
+		//		if (input->scaleFactor < 0.1f)
+		//		{
+		//			input->scaleFactor = 0.1f;
+		//		}
+		//	}
+		//);
 
 		// 隐藏光标
 		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -196,6 +197,13 @@ int main()
 				InputState* input = static_cast<InputState*>(
 					glfwGetWindowUserPointer(window)
 					);
+
+				if (!input->cameraControlActive)
+				{
+					//没有控制相机的时候，重置
+					input->firstMouse = true;
+					return;
+				}
 
 				if (input->firstMouse)
 				{
@@ -232,10 +240,6 @@ int main()
 
 		// 显示鼠标
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
-		// 暂时停用原来的鼠标转向和滚轮缩放
-		glfwSetCursorPosCallback(window, nullptr);
-		glfwSetScrollCallback(window, nullptr);
 
 		// 创建Imgui上下文
 		IMGUI_CHECKVERSION();
@@ -357,6 +361,37 @@ int main()
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
+
+			const ImGuiIO& io = ImGui::GetIO();
+			//是否按住右键
+			const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+			// 开始控制的时候，鼠标必须在界面外面
+			// 一直保持到右键松开
+			const bool enableCamera = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE &&
+				rightMouseDown &&
+				// 当前是相机激活状态 或者 IMGUI不捕捉鼠标
+				(inputState.cameraControlActive || !io.WantCaptureMouse);
+			// 状态发生变化时切换光标模式
+			if (enableCamera != inputState.cameraControlActive)
+			{
+				inputState.cameraControlActive = enableCamera;
+				inputState.firstMouse = true;
+
+				glfwSetInputMode(
+					window,
+					GLFW_CURSOR,
+					enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
+				);
+			}
+
+			// 面板不需要鼠标输入的时候，滚轮用于缩放物体
+			if (!io.WantCaptureMouse)
+			{
+				scaleFactor += io.MouseWheel * 0.1f;
+
+				if (scaleFactor < 0.1f)
+					scaleFactor = 0.1f;
+			}
 
 			//此时只是生成界面，实际绘制放在后面。
 			//ImGui::ShowDemoWindow();
