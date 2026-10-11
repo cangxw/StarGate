@@ -20,6 +20,7 @@
 #include "Camera.h"
 #include "Mesh.h"
 #include "Texture2D.h"
+#include "SceneObject.h"
 
 struct InputState
 {
@@ -245,11 +246,20 @@ int main()
 			}
 		);
 
-		const glm::vec3 cubePositions[] = {
-			glm::vec3(-1.5f, 0.0f, -1.0f),
-			glm::vec3(0.0f, 0.0f, 0.0f),
-			glm::vec3(1.5f, 0.0f, -1.0f)
-		};
+		SceneObject cubeObjects[3];
+
+		//左
+		cubeObjects[0].position = glm::vec3(-1.5f, 0.0f, -1.0f);
+		cubeObjects[0].rotation = glm::vec3(20.0f, 30.0f, 0.0f);
+		cubeObjects[0].scale = glm::vec3(0.7f);
+
+		//中
+		cubeObjects[1].rotation = glm::vec3(20.0f, 0.0f, 0.0f);
+
+		//右边
+		cubeObjects[2].position = glm::vec3(1.5f, 0.0f, -1.0f);
+		cubeObjects[2].rotation = glm::vec3(0.0f, -25.0f, 15.0f);
+		cubeObjects[2].scale = glm::vec3(0.8f);
 
 		// 主循环
 		while (!glfwWindowShouldClose(window))
@@ -384,18 +394,23 @@ int main()
 			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 			
+			cubeObjects[1].position.x = offsetX;
+			cubeObjects[1].rotation.y = rotationAngle;
+			cubeObjects[1].scale = glm::vec3(scaleFactor);
+
 			texture.Bind();
-			for (const glm::vec3& position : cubePositions)
+			for (const SceneObject& object : cubeObjects)
 			{
 				glm::mat4 transform(1.0f);
 
-				transform = glm::translate(transform, position + glm::vec3(offsetX, 0.0f, 0.0f));
-				transform = glm::rotate(transform, glm::radians(rotationAngle),
-					glm::vec3(0.0f, 1.0f, 0.0f));
+				transform = glm::translate(transform, object.position);
+
+				transform = glm::rotate(transform, glm::radians(object.rotation.y),glm::vec3(0.0f, 1.0f, 0.0f));
 				//glm::radians(rotationAngle) 将角度转换为弧度，因为glm::rotate函数需要弧度值
 				// glm::vec3(0, 0, 1) 表示绕Z轴旋转，这里假设三角形在XY平面上
-				transform = glm::rotate(transform, glm::radians(20.0f), glm::vec3(1, 0, 0));
-				transform = glm::scale(transform, glm::vec3(scaleFactor));
+				transform = glm::rotate(transform, glm::radians(object.rotation.x), glm::vec3(1, 0, 0));
+				transform = glm::rotate(transform,glm::radians(object.rotation.z),glm::vec3(0.0f, 0.0f, 1.0f));
+				transform = glm::scale(transform, object.scale);
 
 				shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
 				cubeMesh.Draw();
