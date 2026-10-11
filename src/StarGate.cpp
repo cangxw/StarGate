@@ -20,10 +20,8 @@
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
 #include "Camera.h"
-#include "Mesh.h"
-#include "Texture2D.h"
 #include "SceneObject.h"
-#include "ModelLoader.h"
+#include "Model.h"
 
 struct InputState
 {
@@ -108,62 +106,39 @@ int main()
 
 	const double targetFrameTime = 1.0 / 60.0; // 目标帧时间，60 FPS
 
-	ModelData modelData;
-	if (!LoadModel(STARGATE_ASSET_DIR "/models/cube.obj", modelData))
-	{
-		glfwDestroyWindow(window);
-		glfwTerminate();
-		return -1;
-	}
-
-	// 绘制函数的索引数量参数使用 GLsizei，转换前检查范围
-	if (modelData.indices.size() > static_cast<std::size_t>(std::numeric_limits<GLsizei>::max()))
-	{
-		std::cerr << "Model has too many indices to draw."
-			<< std::endl;
-
-		glfwDestroyWindow(window);
-		glfwTerminate();
-		return -1;
-	}
-
-	std::cout << "Vertices: " << modelData.vertices.size() / 8
-		<< ", indices: " << modelData.indices.size()
-		<< std::endl;
-
-	std::cout << "Submeshes: " << modelData.subMeshes.size()
-		<< ", materials: " << modelData.materials.size()
-		<< std::endl;
-
 	//GLint maxComponents = 0;
 	//glGetIntegerv(GL_MAX_VERTEX_OUTPUT_COMPONENTS, &maxComponents);
 
 	//std::cout << "Max vertex output components: "  --> 128个
 	//	<< maxComponents << std::endl;
 
+	//[&]() -> int
+	//	{
+	//		// 函数体
+	//		return 0;
+	//	}
+	// [&]：需要使用的外部局部变量，默认按引用捕获。
+
+	const int runResult = [&]()-> int
 	{
 		Shader shader(
 			STARGATE_ASSET_DIR "/shaders/lit.vert",
 			STARGATE_ASSET_DIR "/shaders/lit.frag"
 		);
+
 		if (!shader.IsValid())
 		{
 			std::cerr << "Failed to create shader program" << std::endl;
-
-			glfwDestroyWindow(window);
-			glfwTerminate();
 			return -1;
 		}
 
-		// 创建立方体
-		// 数组总字节数 / 一个元素的字节数 = 索引个数
-		const GLsizei indexCount = static_cast<GLsizei>(modelData.indices.size());
-		const GLsizeiptr vertexDataSize = static_cast<GLsizeiptr>(modelData.vertices.size() * sizeof(float));
+		Model  model(STARGATE_ASSET_DIR "/models/material_test/cube.obj");
+		if (!model.IsValid())
+		{
+			std::cerr << "Failed to create model"<< std::endl;
+			return -1;
+		}
 
-		Mesh cubeMesh(modelData.vertices.data(), vertexDataSize, modelData.indices.data(), indexCount);
-
-		// ------------------------创建纹理-----------------------------------------
-		Texture2D texture(STARGATE_ASSET_DIR "/textures/crate.png");
 		shader.Bind();
 		shader.SetInt("uTexture", 0);
 
@@ -386,7 +361,6 @@ int main()
 			cubeObjects[1].rotation.y = rotationAngle;
 			cubeObjects[1].scale = glm::vec3(scaleFactor);
 
-			texture.Bind();
 			for (const SceneObject& object : cubeObjects)
 			{
 				glm::mat4 transform(1.0f);
@@ -401,11 +375,7 @@ int main()
 				transform = glm::scale(transform, object.scale);
 
 				shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
-				
-				for (const SubMeshData& subMesh : modelData.subMeshes)
-				{
-					cubeMesh.Draw(subMesh.firstIndex, static_cast<GLsizei>(subMesh.indexCount));
-				}
+				model.Draw(shader);
 			}
 
 			// 把这一帧的渲染结果显示到屏幕上
@@ -456,9 +426,11 @@ int main()
 		glfwSetCursorPosCallback(window, nullptr);
 		glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
 		glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
-	}
+
+		return 0;
+	}();
 	// Shader已经释放，现在销毁OpenGL Context
 	glfwDestroyWindow(window);
 	glfwTerminate();
-	return 0;
+	return runResult;
 }

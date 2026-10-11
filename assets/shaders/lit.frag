@@ -5,6 +5,8 @@ in vec3 vNormal;
 in vec3 vWorldPosition;
 
 uniform sampler2D uTexture;
+uniform vec3 uMaterialColor; // 当前子网格的材质颜色
+uniform bool uHasTexture;
 
 uniform vec3 uToLightDirection;
 uniform vec3 uLightColor;
@@ -18,7 +20,12 @@ out vec4 fragmentColor; // 输出颜色
 void main()
 {
 	// texture ：插值后的uv，在纹理中取色
-	vec4 baseColor = texture(uTexture, vTexCoord); 
+	vec4 baseColor = vec4(1.0);
+
+	if(uHasTexture)
+		baseColor = texture(uTexture, vTexCoord); 
+
+	baseColor.rgb *= uMaterialColor;
 
 	vec3 normal = normalize(vNormal);
 	vec3 toLight = normalize(uToLightDirection);
