@@ -32,8 +32,6 @@ struct InputState
 {
 	Camera* camera = nullptr;
 
-	float scaleFactor = 1.0f;
-
 	double lastMouseX = 0.0;
 	double lastMouseY = 0.0;
 	bool firstMouse = true;
@@ -158,17 +156,13 @@ int main()
 		const bool timerResolutionEnabled = timeBeginPeriod(1) == TIMERR_NOERROR; // 设置系统定时器分辨率为1ms
 		lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
 
-		float offsetX = 0.0f; // 偏移量初始值
 		const float moveSpeed = 0.8f; // 偏移量变化速度
-
-		float rotationAngle = 0.0f; // 旋转角度初始值
 		const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
 
 		Camera camera;
 		InputState inputState;
 		inputState.camera = &camera;
 
-		float& scaleFactor = inputState.scaleFactor;
 		glfwSetWindowUserPointer(window, &inputState); // 将缩放因子指针存储在窗口的用户指针中
 
 		//glfwSetScrollCallback(
@@ -238,6 +232,14 @@ int main()
 		cubeObjects[2].rotation = glm::vec3(0.0f, -25.0f, 15.0f);
 		cubeObjects[2].scale = glm::vec3(0.8f);
 
+		const char* objectNames[] = {
+			"Left Cube",
+			"Middle Cube",
+			"Right Cube"
+		};
+
+		int selectedObjectIndex = 1;
+
 		// 显示鼠标
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
@@ -283,24 +285,26 @@ int main()
 
 			if (!ImGui::GetIO().WantCaptureKeyboard)
 			{
+				SceneObject& ketboardObject = cubeObjects[selectedObjectIndex];
+
 				if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
 				{
-					offsetX -= moveDistance;
+					ketboardObject.position.x -= moveDistance;
 				}
 
 				if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
 				{
-					offsetX += moveDistance;
+					ketboardObject.position.x += moveDistance;
 				}
 
 				const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
 				if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
 				{
-					rotationAngle += rotationStep; // 逆时针旋转
+					ketboardObject.rotation.y += rotationStep; // 逆时针旋转
 				}
 				if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
 				{
-					rotationAngle -= rotationStep; // 顺时针旋转
+					ketboardObject.rotation.y -= rotationStep; // 顺时针旋转
 				}
 
 				// 切换灯光颜色
@@ -387,34 +391,49 @@ int main()
 			// 面板不需要鼠标输入的时候，滚轮用于缩放物体
 			if (!io.WantCaptureMouse)
 			{
-				scaleFactor += io.MouseWheel * 0.1f;
+				SceneObject& scrollObject = cubeObjects[selectedObjectIndex];
+				scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
 
-				if (scaleFactor < 0.1f)
-					scaleFactor = 0.1f;
+				scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
 			}
 
+			ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_Once);
+			ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_Once);
+			if (ImGui::Begin("Hierarchy"))
+			{
+				for (int i = 0; i < 3; ++i)
+				{
+					const bool selected = (i == selectedObjectIndex);
+
+					if (ImGui::Selectable(objectNames[i], selected))
+					{
+						selectedObjectIndex = i;
+					}
+				}
+			}
+			ImGui::End();
+
+			// 在列表处理之后取得选中物体
+			SceneObject& selectedObject = cubeObjects[selectedObjectIndex];
 			//此时只是生成界面，实际绘制放在后面。
 			//ImGui::ShowDemoWindow();
-			ImGui::SetNextWindowSize(
-				ImVec2(360.0f * uiScale, 420.0f * uiScale),
-				ImGuiCond_Once
-			);
+			ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_Once);
+			ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale),ImGuiCond_Once);
 
 			if (ImGui::Begin("Inspector"))
 			{
-				ImGui::Text("Middle Object");
+				ImGui::Text(
+					"Selected: %s",
+					objectNames[selectedObjectIndex]
+				);
 
-				ImGui::SliderFloat("Position X", &offsetX, -3.0f, 3.0f);
+				ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
+				ImGui::DragFloat3("Rotation", glm::value_ptr(selectedObject.rotation), 0.5f);
+				ImGui::DragFloat3("Scale", glm::value_ptr(selectedObject.scale), 0.01f, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
 
-				ImGui::SliderFloat("Rotation Y", &rotationAngle, -180.0f, 180.0f);
-
-				ImGui::SliderFloat("Scale", &scaleFactor, 0.1f, 3.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-
-				if (ImGui::Button("Reset Object"))
+				if (ImGui::Button("Reset Transform"))
 				{
-					offsetX = 0.0f;
-					rotationAngle = 0.0f;
-					scaleFactor = 1.0f;
+					selectedObject = SceneObject{};
 				}
 
 				ImGui::Separator();
@@ -465,10 +484,6 @@ int main()
 
 			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
-			
-			cubeObjects[1].position.x = offsetX;
-			cubeObjects[1].rotation.y = rotationAngle;
-			cubeObjects[1].scale = glm::vec3(scaleFactor);
 
 			for (const SceneObject& object : cubeObjects)
 			{
