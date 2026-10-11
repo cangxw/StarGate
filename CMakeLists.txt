@@ -1,7 +1,7 @@
 ﻿# CMakeList.txt: StarGate 的 CMake 项目，在此处包括源代码并定义
 # 项目特定的逻辑。
 #
-cmake_minimum_required (VERSION 3.10)
+cmake_minimum_required (VERSION 3.22)
 
 # 如果支持，请为 MSVC 编译器启用热重载。
 if (POLICY CMP0141)
@@ -19,6 +19,29 @@ set(GLFW_INSTALL OFF)
 
 # 加入 GLFW 的构建配置。
 add_subdirectory(third_party/glfw)
+
+# 使用静态库
+set(BUILD_SHARED_LIBS OFF)
+
+# 关闭当前不需要的工具，示例，测试和导出功能
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF)
+set(ASSIMP_BUILD_ASSIMP_VIEW OFF)
+set(ASSIMP_BUILD_SAMPLES OFF)
+set(ASSIMP_BUILD_TESTS OFF)
+set(ASSIMP_INSTALL OFF)
+set(ASSIMP_NO_EXPORT ON)
+set(ASSIMP_WARNINGS_AS_ERRORS OFF)
+
+# 使用 Assimp 自带的 zlib
+set(ASSIMP_BUILD_ZLIB ON)
+
+# 先只启用 OBJ、FBX、glTF 模型导入
+set(ASSIMP_BUILD_ALL_IMPORTERS_BY_DEFAULT OFF)
+set(ASSIMP_BUILD_OBJ_IMPORTER ON)
+set(ASSIMP_BUILD_FBX_IMPORTER ON)
+set(ASSIMP_BUILD_GLTF_IMPORTER ON)
+
+add_subdirectory(third_party/assimp)
 
 # 将 GLAD 编译成静态库
 add_library(glad STATIC third_party/glad/src/gl.c)
@@ -53,7 +76,12 @@ target_include_directories(StarGate PRIVATE
 )
 
 # 让 StarGate 使用 GLFW。
-target_link_libraries(StarGate PRIVATE glfw glad winmm opengl32)
+target_link_libraries(StarGate PRIVATE 
+	glfw 
+	glad 
+	winmm 
+	opengl32
+	assimp::assimp)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET StarGate PROPERTY CXX_STANDARD 20)

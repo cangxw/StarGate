@@ -14,6 +14,7 @@
 #include <mmsystem.h> // Windows 定时器接口
 #include <glm/glm.hpp> // 用于矩阵和向量操作
 #include <glm/gtc/matrix_transform.hpp> // 用于矩阵变换
+#include <assimp/version.h>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -46,6 +47,13 @@ int main()
 		std::cerr << "Failed to initialize GLFW" << std::endl;
 		return -1;
 	}
+
+	// 输出assimp版本
+	std::cout << "Assimp "
+		<< aiGetVersionMajor() << "."
+		<< aiGetVersionMinor() << "."
+		<< aiGetVersionRevision()
+		<< std::endl;
 
 	// 创建一个窗口
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
