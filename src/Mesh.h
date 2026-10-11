@@ -1,6 +1,7 @@
 #pragma once
 
 #include <glad/gl.h>
+#include <cstddef>
 
 class Mesh
 {
@@ -15,6 +16,8 @@ public:
 	~Mesh();
 	
 	void Draw() const;
+
+	void Draw(std::size_t firstIndex, GLsizei indexCount) const;
 
 	//禁止复制
 	Mesh(const Mesh&) = delete;

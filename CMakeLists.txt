@@ -62,6 +62,9 @@ add_executable (StarGate
 	"src/Texture2D.h"
 	"src/Texture2D.cpp"
 	"src/SceneObject.h"
+	"src/ModelLoader.h"
+	"src/ModelLoader.cpp"
+	"src/MaterialData.h" 
 )
 
 # 资源文件目录，这样读取图片不依赖vs的目录

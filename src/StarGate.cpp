@@ -15,6 +15,7 @@
 #include <glm/glm.hpp> // 用于矩阵和向量操作
 #include <glm/gtc/matrix_transform.hpp> // 用于矩阵变换
 #include <assimp/version.h>
+#include <limits>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -22,6 +23,7 @@
 #include "Mesh.h"
 #include "Texture2D.h"
 #include "SceneObject.h"
+#include "ModelLoader.h"
 
 struct InputState
 {
@@ -106,55 +108,32 @@ int main()
 
 	const double targetFrameTime = 1.0 / 60.0; // 目标帧时间，60 FPS
 
-	// 绘制立方体
-	const float vertices[] = {
-		// X     Y     Z      U     V      Nx    Ny    Nz
+	ModelData modelData;
+	if (!LoadModel(STARGATE_ASSET_DIR "/models/cube.obj", modelData))
+	{
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		return -1;
+	}
 
-		// 后面：0～3，朝 -Z
-		 0.5f, -0.5f, -0.5f, 0.0f, 0.0f,  0.0f,  0.0f, -1.0f,
-		-0.5f, -0.5f, -0.5f, 1.0f, 0.0f,  0.0f,  0.0f, -1.0f,
-		-0.5f,  0.5f, -0.5f, 1.0f, 1.0f,  0.0f,  0.0f, -1.0f,
-		 0.5f,  0.5f, -0.5f, 0.0f, 1.0f,  0.0f,  0.0f, -1.0f,
+	// 绘制函数的索引数量参数使用 GLsizei，转换前检查范围
+	if (modelData.indices.size() > static_cast<std::size_t>(std::numeric_limits<GLsizei>::max()))
+	{
+		std::cerr << "Model has too many indices to draw."
+			<< std::endl;
 
-		 // 前面：4～7，朝 +Z
-		 -0.5f, -0.5f,  0.5f, 0.0f, 0.0f,  0.0f,  0.0f,  1.0f,
-		  0.5f, -0.5f,  0.5f, 1.0f, 0.0f,  0.0f,  0.0f,  1.0f,
-		  0.5f,  0.5f,  0.5f, 1.0f, 1.0f,  0.0f,  0.0f,  1.0f,
-		 -0.5f,  0.5f,  0.5f, 0.0f, 1.0f,  0.0f,  0.0f,  1.0f,
+		glfwDestroyWindow(window);
+		glfwTerminate();
+		return -1;
+	}
 
-		 // 左面：8～11，朝 -X
-		 -0.5f, -0.5f, -0.5f, 0.0f, 0.0f, -1.0f,  0.0f,  0.0f,
-		 -0.5f, -0.5f,  0.5f, 1.0f, 0.0f, -1.0f,  0.0f,  0.0f,
-		 -0.5f,  0.5f,  0.5f, 1.0f, 1.0f, -1.0f,  0.0f,  0.0f,
-		 -0.5f,  0.5f, -0.5f, 0.0f, 1.0f, -1.0f,  0.0f,  0.0f,
+	std::cout << "Vertices: " << modelData.vertices.size() / 8
+		<< ", indices: " << modelData.indices.size()
+		<< std::endl;
 
-		 // 右面：12～15，朝 +X
-		  0.5f, -0.5f,  0.5f, 0.0f, 0.0f,  1.0f,  0.0f,  0.0f,
-		  0.5f, -0.5f, -0.5f, 1.0f, 0.0f,  1.0f,  0.0f,  0.0f,
-		  0.5f,  0.5f, -0.5f, 1.0f, 1.0f,  1.0f,  0.0f,  0.0f,
-		  0.5f,  0.5f,  0.5f, 0.0f, 1.0f,  1.0f,  0.0f,  0.0f,
-
-		  // 底面：16～19，朝 -Y
-		  -0.5f, -0.5f, -0.5f, 0.0f, 0.0f,  0.0f, -1.0f,  0.0f,
-		   0.5f, -0.5f, -0.5f, 1.0f, 0.0f,  0.0f, -1.0f,  0.0f,
-		   0.5f, -0.5f,  0.5f, 1.0f, 1.0f,  0.0f, -1.0f,  0.0f,
-		  -0.5f, -0.5f,  0.5f, 0.0f, 1.0f,  0.0f, -1.0f,  0.0f,
-
-		  // 顶面：20～23，朝 +Y
-		  -0.5f,  0.5f,  0.5f, 0.0f, 0.0f,  0.0f,  1.0f,  0.0f,
-		   0.5f,  0.5f,  0.5f, 1.0f, 0.0f,  0.0f,  1.0f,  0.0f,
-		   0.5f,  0.5f, -0.5f, 1.0f, 1.0f,  0.0f,  1.0f,  0.0f,
-		  -0.5f,  0.5f, -0.5f, 0.0f, 1.0f,  0.0f,  1.0f,  0.0f
-	};
-
-	const unsigned int indices[] = {
-		 0,  1,  2,   2,  3,  0,  
-		 4,  5,  6,   6,  7,  4,
-		 8,  9, 10,  10, 11,  8,
-		12, 13, 14,  14, 15, 12,
-		16, 17, 18,  18, 19, 16,
-		20, 21, 22,  22, 23, 20
-	};
+	std::cout << "Submeshes: " << modelData.subMeshes.size()
+		<< ", materials: " << modelData.materials.size()
+		<< std::endl;
 
 	//GLint maxComponents = 0;
 	//glGetIntegerv(GL_MAX_VERTEX_OUTPUT_COMPONENTS, &maxComponents);
@@ -178,9 +157,10 @@ int main()
 
 		// 创建立方体
 		// 数组总字节数 / 一个元素的字节数 = 索引个数
-		const GLsizei indexCount = static_cast<GLsizei>(sizeof(indices) / sizeof(indices[0]));
+		const GLsizei indexCount = static_cast<GLsizei>(modelData.indices.size());
+		const GLsizeiptr vertexDataSize = static_cast<GLsizeiptr>(modelData.vertices.size() * sizeof(float));
 
-		Mesh cubeMesh(vertices, sizeof(vertices), indices, indexCount);
+		Mesh cubeMesh(modelData.vertices.data(), vertexDataSize, modelData.indices.data(), indexCount);
 
 		// ------------------------创建纹理-----------------------------------------
 		Texture2D texture(STARGATE_ASSET_DIR "/textures/crate.png");
@@ -421,7 +401,11 @@ int main()
 				transform = glm::scale(transform, object.scale);
 
 				shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
-				cubeMesh.Draw();
+				
+				for (const SubMeshData& subMesh : modelData.subMeshes)
+				{
+					cubeMesh.Draw(subMesh.firstIndex, static_cast<GLsizei>(subMesh.indexCount));
+				}
 			}
 
 			// 把这一帧的渲染结果显示到屏幕上

@@ -80,13 +80,30 @@ Mesh::~Mesh()
 
 void Mesh::Draw() const
 {
+	Draw(0, m_IndexCount);
+}
+
+void Mesh::Draw(std::size_t firstIndex, GLsizei indexCount) const
+{
+	const std::size_t totalCount = static_cast<std::size_t>(m_IndexCount);
+
+	// 防止读取超出 EBO 的范围
+	if (indexCount <= 0 || firstIndex > totalCount ||
+		static_cast<std::size_t>(indexCount) > totalCount - firstIndex)
+	{
+		return;
+	}
+
+	// OpenGL 要的是字节偏移，因此要乘以一个索引的大小
+	const std::size_t byteOffset = firstIndex * sizeof(unsigned int);
+
 	glBindVertexArray(m_VAO);
 	// 用索引绘制，这一步开始执行顶点着色器
 	glDrawElements(
 		GL_TRIANGLES,
-		m_IndexCount,
+		indexCount,
 		GL_UNSIGNED_INT,
-		nullptr
+		reinterpret_cast<const void*>(byteOffset)
 	);
 
 	glBindVertexArray(0);
