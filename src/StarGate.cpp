@@ -22,12 +22,21 @@
 #include <imgui_impl_opengl3.h>
 #include <glm/gtc/type_ptr.hpp>	//这个头文件提供 glm::value_ptr()，用来取得 GLM 向量或矩阵内部数据的指针
 
+#include <json11.hpp>
+#include <iterator> // std::size
+#include <string>
+#include <filesystem>
+#include <system_error>
+
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
 #include "Camera.h"
 #include "SceneObject.h"
 #include "Model.h"
 #include "Framebuffer.h"
+#include "SceneData.h"
+#include "SceneSerializer.h"
+
 
 struct InputState
 {
@@ -138,7 +147,54 @@ int main()
 			return -1;
 		}
 
-		Model model(STARGATE_ASSET_DIR "/models/material_test/cube.obj");
+		SceneData scene;
+		scene.modelPath = "models/material_test/cube.obj";
+
+		// 默认场景：文件不存在或读取失败时使用
+		scene.objects.resize(3);
+		// 左边
+		scene.objects[0].name = "Left Cube";
+		scene.objects[0].position = glm::vec3(-1.5f, 0.0f, -1.0f);
+		scene.objects[0].rotation = glm::vec3(20.0f, 30.0f, 0.0f);
+		scene.objects[0].scale = glm::vec3(0.7f);
+
+		// 中间
+		scene.objects[1].name = "Middle Cube";
+		scene.objects[1].rotation = glm::vec3(20.0f, 0.0f, 0.0f);
+
+		// 右边
+		scene.objects[2].name = "Right Cube";
+		scene.objects[2].position = glm::vec3(1.5f, 0.0f, -1.0f);
+		scene.objects[2].rotation = glm::vec3(0.0f, -25.0f, 15.0f);
+		scene.objects[2].scale = glm::vec3(0.8f);
+
+		const char* sceneFilePath = STARGATE_ASSET_DIR "/scenes/default.json";
+
+		// 检查是否已经有保存的场景
+		std::error_code sceneFileError;
+		const bool sceneFileExists = std::filesystem::exists(sceneFilePath, sceneFileError);
+
+		if (sceneFileError)
+		{
+			std::cerr << "Failed to check scene file: " << sceneFileError.message() << '\n';
+		}
+		else if (sceneFileExists)
+		{
+			if (LoadScene(sceneFilePath, scene))
+			{
+				std::cout << "Scene loaded.\n";
+			}
+			else
+			{
+				std::cerr << "Using default scene.\n";
+			}
+		}
+
+		// 根据场景里的模型路径加载模型
+		const std::string modelFullPath = std::string(STARGATE_ASSET_DIR) + "/" + scene.modelPath;
+
+		Model model(modelFullPath.c_str());
+
 		if (!model.IsValid())
 		{
 			std::cerr << "Failed to create model"<< std::endl;
@@ -218,28 +274,7 @@ int main()
 			}
 		);
 
-		SceneObject cubeObjects[3];
-
-		//左
-		cubeObjects[0].position = glm::vec3(-1.5f, 0.0f, -1.0f);
-		cubeObjects[0].rotation = glm::vec3(20.0f, 30.0f, 0.0f);
-		cubeObjects[0].scale = glm::vec3(0.7f);
-
-		//中
-		cubeObjects[1].rotation = glm::vec3(20.0f, 0.0f, 0.0f);
-
-		//右边
-		cubeObjects[2].position = glm::vec3(1.5f, 0.0f, -1.0f);
-		cubeObjects[2].rotation = glm::vec3(0.0f, -25.0f, 15.0f);
-		cubeObjects[2].scale = glm::vec3(0.8f);
-
-		const char* objectNames[] = {
-			"Left Cube",
-			"Middle Cube",
-			"Right Cube"
-		};
-
-		int selectedObjectIndex = 1;
+		std::size_t selectedObjectIndex = 0;
 
 		// 显示鼠标
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -274,6 +309,8 @@ int main()
 		ImGui_ImplGlfw_InitForOpenGL(window, true);
 		ImGui_ImplOpenGL3_Init("#version 330 core");
 
+		std::string sceneSaveMessage;
+
 		// 主循环
 		while (!glfwWindowShouldClose(window))
 		{
@@ -297,7 +334,7 @@ int main()
 
 			if (!ImGui::GetIO().WantCaptureKeyboard)
 			{
-				SceneObject& ketboardObject = cubeObjects[selectedObjectIndex];
+				SceneObject& ketboardObject = scene.objects[selectedObjectIndex];
 
 				if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
 				{
@@ -382,36 +419,6 @@ int main()
 			ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
 
 			const ImGuiIO& io = ImGui::GetIO();
-			////是否按住右键
-			//const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-			//// 开始控制的时候，鼠标必须在界面外面
-			//// 一直保持到右键松开
-			//const bool enableCamera = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE &&
-			//	rightMouseDown &&
-			//	// 当前是相机激活状态 或者 IMGUI不捕捉鼠标
-			//	(inputState.cameraControlActive || !io.WantCaptureMouse);
-			//// 状态发生变化时切换光标模式
-			//if (enableCamera != inputState.cameraControlActive)
-			//{
-			//	inputState.cameraControlActive = enableCamera;
-			//	inputState.firstMouse = true;
-
-			//	glfwSetInputMode(
-			//		window,
-			//		GLFW_CURSOR,
-			//		enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
-			//	);
-			//}
-
-			// 面板不需要鼠标输入的时候，滚轮用于缩放物体
-			//if (!io.WantCaptureMouse)
-			//{
-			//	SceneObject& scrollObject = cubeObjects[selectedObjectIndex];
-			//	scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
-
-			//	scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
-			//}
-
 			ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
 			ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
 			if (ImGui::Begin("Hierarchy"))
@@ -420,7 +427,7 @@ int main()
 				{
 					const bool selected = (i == selectedObjectIndex);
 
-					if (ImGui::Selectable(objectNames[i], selected))
+					if (ImGui::Selectable(scene.objects[i].name.c_str(), selected))
 					{
 						selectedObjectIndex = i;
 					}
@@ -429,7 +436,7 @@ int main()
 			ImGui::End();
 
 			// 在列表处理之后取得选中物体
-			SceneObject& selectedObject = cubeObjects[selectedObjectIndex];
+			SceneObject& selectedObject = scene.objects[selectedObjectIndex];
 			//此时只是生成界面，实际绘制放在后面。
 			//ImGui::ShowDemoWindow();
 			ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
@@ -439,7 +446,7 @@ int main()
 			{
 				ImGui::Text(
 					"Selected: %s",
-					objectNames[selectedObjectIndex]
+					scene.objects[selectedObjectIndex].name.c_str()
 				);
 
 				ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
@@ -448,7 +455,31 @@ int main()
 
 				if (ImGui::Button("Reset Transform"))
 				{
-					selectedObject = SceneObject{};
+					selectedObject.position = glm::vec3(0.0f);
+					selectedObject.rotation = glm::vec3(0.0f);
+					selectedObject.scale = glm::vec3(1.0f);
+				}
+
+				ImGui::Separator();
+
+				// 保存场景
+				if (ImGui::Button("Save Scene"))
+				{
+					const bool saved = SaveScene(
+						STARGATE_ASSET_DIR "/scenes/default.json",
+						scene.modelPath.c_str(),
+						scene.objects.data(),
+						scene.objects.size()
+					);
+
+					sceneSaveMessage = saved
+						? "Scene saved."
+						: "Save failed. Check console.";
+				}
+
+				if (!sceneSaveMessage.empty())
+				{
+					ImGui::TextWrapped("%s", sceneSaveMessage.c_str());
 				}
 
 				ImGui::Separator();
@@ -523,7 +554,7 @@ int main()
 			// 鼠标位于场景画面上时，滚轮缩放选中的物体
 			if (windowFocused && sceneHovered)
 			{
-				SceneObject& scrollObject = cubeObjects[selectedObjectIndex];
+				SceneObject& scrollObject = scene.objects[selectedObjectIndex];
 
 				scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
 				scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
@@ -567,7 +598,7 @@ int main()
 			shader.SetMat4("uView", view);
 			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
 
-			for (const SceneObject& object : cubeObjects)
+			for (const SceneObject& object : scene.objects)
 			{
 				glm::mat4 transform(1.0f);
 

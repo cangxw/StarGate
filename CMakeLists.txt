@@ -67,6 +67,15 @@ target_include_directories(imgui PUBLIC
 
 target_link_libraries(imgui PUBLIC glfw)
 
+# JSON 解析与序列化
+add_library(json11 STATIC
+    third_party/json11/json11.cpp
+)
+
+target_include_directories(json11 PUBLIC
+    third_party/json11
+)
+
 # 将源代码添加到此项目的可执行文件。
 add_executable (StarGate 
 	"src/StarGate.cpp"
@@ -87,6 +96,9 @@ add_executable (StarGate
 	"src/Model.cpp" 
 	"src/Framebuffer.h"
 	"src/Framebuffer.cpp"
+	"src/SceneSerializer.h"
+	"src/SceneSerializer.cpp"
+	"src/SceneData.h"
 )
 
 # 资源文件目录，这样读取图片不依赖vs的目录
@@ -107,7 +119,8 @@ target_link_libraries(StarGate PRIVATE
 	imgui
 	winmm 
 	opengl32
-	assimp::assimp)
+	assimp::assimp
+	json11)
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
   set_property(TARGET StarGate PROPERTY CXX_STANDARD 20)
