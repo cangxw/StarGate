@@ -78,6 +78,7 @@ bool SaveScene(const char* filePath,const char* modelPath,const SceneObject* obj
             json11::Json::object
             {
                 {"name", object.name},
+                { "modelPath", object.modelPath.empty() ? std::string(modelPath) : object.modelPath },
                 { "position", Vec3ToJson(object.position) },
                 { "rotation", Vec3ToJson(object.rotation) },
                 { "scale", Vec3ToJson(object.scale) },
@@ -87,7 +88,7 @@ bool SaveScene(const char* filePath,const char* modelPath,const SceneObject* obj
 
     // 构建整个场景的数据
     const json11::Json sceneJson = json11::Json::object{
-        { "version", 1 },
+        { "version", 2 },
         { "modelPath", modelPath },
         { "objects", objectArray }
     };
@@ -169,10 +170,12 @@ bool LoadScene(const char* filePath, SceneData& scene)
         return false;
     }
 
+    const double sceneVersion = root["version"].number_value();
+
     // 检查场景文件的基本结构
     if (!root.is_object() ||
         !root["version"].is_number() ||
-        root["version"].number_value() != 1.0 ||
+        (sceneVersion != 1.0 && sceneVersion != 2.0) ||
         !root["modelPath"].is_string() ||
         !root["objects"].is_array())
     {
@@ -200,6 +203,29 @@ bool LoadScene(const char* filePath, SceneData& scene)
 
         SceneObject object;
         object.name = objectJson["name"].string_value();
+
+        if (sceneVersion == 1.0)
+        {
+            // 旧场景中，所有物体使用共同的模型
+            object.modelPath = result.modelPath;
+        }
+        else
+        {
+            if (!objectJson["modelPath"].is_string())
+            {
+                std::cerr << "Invalid object model path\n";
+                return false;
+            }
+
+            object.modelPath = objectJson["modelPath"].string_value();
+        }
+
+        if (object.modelPath.empty() ||
+            std::filesystem::u8path(object.modelPath).has_root_path())
+        {
+            std::cerr << "Object model path must be relative to assets\n";
+            return false;
+        }
 
         if (!JsonToVec3(objectJson["position"], object.position) ||
             !JsonToVec3(objectJson["rotation"], object.rotation) ||

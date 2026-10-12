@@ -1,0 +1,63 @@
+{
+  "version": 2,
+  "modelPath": "models/showcase/flight_helmet/FlightHelmet.gltf",
+  "objects": [
+    {
+      "name": "Flight Helmet",
+      "modelPath": "models/showcase/flight_helmet/FlightHelmet.gltf",
+      "position": [
+        0,
+        -0.69994858,
+        -0.1
+      ],
+      "rotation": [
+        0,
+        -20,
+        0
+      ],
+      "scale": [
+        2.4,
+        2.4,
+        2.4
+      ]
+    },
+    {
+      "name": "Display Stage",
+      "modelPath": "models/showcase/display_stage/stage.obj",
+      "position": [
+        0,
+        -0.85,
+        -0.1
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "name": "Studio Floor",
+      "modelPath": "models/showcase/display_stage/floor.obj",
+      "position": [
+        0,
+        -0.853,
+        0
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ]
+}

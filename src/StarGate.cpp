@@ -31,6 +31,9 @@
 #include <utility>	// 提供移动等通用工具 std::move等
 #include <imgui_internal.h>
 #include <cstddef>
+#include <unordered_map>
+#include <algorithm>
+#include <cctype>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -57,6 +60,80 @@ static std::string PathToUtf8(const std::filesystem::path& path)
 {
 	const std::u8string text = path.generic_u8string();
 	return std::string(text.begin(), text.end());
+}
+
+// 模型路径 → 已加载的模型资源
+using ModelCache = std::unordered_map<std::string, std::unique_ptr<Model>>;
+
+// 物体没有单独指定模型时，使用场景的默认模型
+static const std::string& GetObjectModelPath(
+	const SceneData& scene,
+	const SceneObject& object)
+{
+	return object.modelPath.empty()
+		? scene.modelPath
+		: object.modelPath;
+}
+
+static bool EnsureModelLoaded(const std::string& modelPath, ModelCache& models)
+{
+	// 已经加载过，直接复用
+	if (models.find(modelPath) != models.end())
+	{
+		return true;
+	}
+
+	const std::string fullPath =
+		std::string(STARGATE_ASSET_DIR) + "/" + modelPath;
+
+	auto loadedModel = std::make_unique<Model>(fullPath.c_str());
+
+	if (!loadedModel->IsValid())
+	{
+		return false;
+	}
+
+	models.emplace(modelPath, std::move(loadedModel));
+	return true;
+}
+
+// 全部模型加载成功后才替换缓存
+static bool LoadSceneModels(const SceneData& scene, ModelCache& models)
+{
+	ModelCache loadedModels;
+
+	for (const SceneObject& object : scene.objects)
+	{
+		const std::string& path = GetObjectModelPath(scene, object);
+
+		if (!EnsureModelLoaded(path, loadedModels))
+		{
+			return false;
+		}
+	}
+
+	models = std::move(loadedModels);
+	return true;
+}
+
+static bool IsModelFile(const std::filesystem::path& path)
+{
+	std::string extension = PathToUtf8(path.extension());
+
+	std::transform(
+		extension.begin(),
+		extension.end(),
+		extension.begin(),
+		[](unsigned char character)
+		{
+			return static_cast<char>(std::tolower(character));
+		}
+	);
+
+	return extension == ".fbx" ||
+		extension == ".obj" ||
+		extension == ".gltf" ||
+		extension == ".glb";
 }
 
 int main()
@@ -123,7 +200,7 @@ int main()
 	// 暂时沿用现有的手动限帧
 	glfwSwapInterval(0); // 不请求垂直同步，后面通过休眠手动限帧
 
-	glClearColor(0.1f, 0.2f, 0.4f, 1.0f); // 设置清屏颜色
+	glClearColor(0.035f, 0.045f, 0.065f, 1.0f); // 设置清屏颜色
 	glEnable(GL_DEPTH_TEST);
 
 	double lastTime = glfwGetTime(); // 进入主循环前的时间记录
@@ -146,791 +223,846 @@ int main()
 	// [&]：需要使用的外部局部变量，默认按引用捕获。
 
 	const int runResult = [&]()-> int
-	{
-		Shader shader(
-			STARGATE_ASSET_DIR "/shaders/lit.vert",
-			STARGATE_ASSET_DIR "/shaders/lit.frag"
-		);
-
-		if (!shader.IsValid())
 		{
-			std::cerr << "Failed to create shader program" << std::endl;
-			return -1;
-		}
+			Shader shader(
+				STARGATE_ASSET_DIR "/shaders/lit.vert",
+				STARGATE_ASSET_DIR "/shaders/lit.frag"
+			);
 
-		SceneData scene;
-		scene.modelPath = "models/material_test/cube.obj";
-
-		// 默认场景：文件不存在或读取失败时使用
-		scene.objects.resize(3);
-		// 左边
-		scene.objects[0].name = "Left Cube";
-		scene.objects[0].position = glm::vec3(-1.5f, 0.0f, -1.0f);
-		scene.objects[0].rotation = glm::vec3(20.0f, 30.0f, 0.0f);
-		scene.objects[0].scale = glm::vec3(0.7f);
-
-		// 中间
-		scene.objects[1].name = "Middle Cube";
-		scene.objects[1].rotation = glm::vec3(20.0f, 0.0f, 0.0f);
-
-		// 右边
-		scene.objects[2].name = "Right Cube";
-		scene.objects[2].position = glm::vec3(1.5f, 0.0f, -1.0f);
-		scene.objects[2].rotation = glm::vec3(0.0f, -25.0f, 15.0f);
-		scene.objects[2].scale = glm::vec3(0.8f);
-
-		const char* sceneFilePath = STARGATE_ASSET_DIR "/scenes/default.json";
-
-		// 检查是否已经有保存的场景
-		std::error_code sceneFileError;
-		const bool sceneFileExists = std::filesystem::exists(sceneFilePath, sceneFileError);
-
-		if (sceneFileError)
-		{
-			std::cerr << "Failed to check scene file: " << sceneFileError.message() << '\n';
-		}
-		else if (sceneFileExists)
-		{
-			if (LoadScene(sceneFilePath, scene))
+			if (!shader.IsValid())
 			{
-				std::cout << "Scene loaded.\n";
+				std::cerr << "Failed to create shader program" << std::endl;
+				return -1;
 			}
-			else
+
+			SceneData scene;
+			scene.modelPath = "models/material_test/cube.obj";
+
+			// 默认场景：文件不存在或读取失败时使用
+			scene.objects.resize(3);
+			// 左边
+			scene.objects[0].name = "Left Cube";
+			scene.objects[0].position = glm::vec3(-1.5f, 0.0f, -1.0f);
+			scene.objects[0].rotation = glm::vec3(20.0f, 30.0f, 0.0f);
+			scene.objects[0].scale = glm::vec3(0.7f);
+
+			// 中间
+			scene.objects[1].name = "Middle Cube";
+			scene.objects[1].rotation = glm::vec3(20.0f, 0.0f, 0.0f);
+
+			// 右边
+			scene.objects[2].name = "Right Cube";
+			scene.objects[2].position = glm::vec3(1.5f, 0.0f, -1.0f);
+			scene.objects[2].rotation = glm::vec3(0.0f, -25.0f, 15.0f);
+			scene.objects[2].scale = glm::vec3(0.8f);
+
+			const char* sceneFilePath = STARGATE_ASSET_DIR "/scenes/default.json";
+
+			// 检查是否已经有保存的场景
+			std::error_code sceneFileError;
+			const bool sceneFileExists = std::filesystem::exists(sceneFilePath, sceneFileError);
+
+			if (sceneFileError)
 			{
-				std::cerr << "Using default scene.\n";
+				std::cerr << "Failed to check scene file: " << sceneFileError.message() << '\n';
 			}
-		}
-
-		// 根据场景里的模型路径加载模型
-		const std::string modelFullPath = std::string(STARGATE_ASSET_DIR) + "/" + scene.modelPath;
-
-		// 使用unique 为了在运行中加载场景时，能够替换当前模型，并自动释放旧模型
-		// 赋值转移的是指针的所有权，不需要复制或移动 Model 对象本身
-		//model 释放旧模型 → 接管新模型
-		// loadedModel     → 变为空指针
-		auto model = std::make_unique<Model>(modelFullPath.c_str());
-
-		if (!model->IsValid())
-		{
-			std::cerr << "Failed to create model"<< std::endl;
-			return -1;
-		}
-
-		shader.Bind();
-		shader.SetInt("uTexture", 0);
-
-		// ------------------------光照信息-----------------------------------------
-		glm::vec3 toLightDirection(0.0f, 0.0f, 1.0f);
-		glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
-		float ambientStrength = 0.2f;
-		// ------------------------光照信息 END-----------------------------------------
-
-		const bool timerResolutionEnabled = timeBeginPeriod(1) == TIMERR_NOERROR; // 设置系统定时器分辨率为1ms
-		lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
-
-		const float moveSpeed = 0.8f; // 偏移量变化速度
-		const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
-
-		Camera camera;
-		InputState inputState;
-		inputState.camera = &camera;
-
-		glfwSetWindowUserPointer(window, &inputState); // 将缩放因子指针存储在窗口的用户指针中
-
-		//glfwSetScrollCallback(
-		//	window,
-		//	[](GLFWwindow* window, double, double yoffset)
-		//	{
-		//		InputState* input = static_cast<InputState*>(
-		//			glfwGetWindowUserPointer(window)
-		//			);
-
-		//		input->scaleFactor += static_cast<float>(yoffset) * 0.1f;
-
-		//		if (input->scaleFactor < 0.1f)
-		//		{
-		//			input->scaleFactor = 0.1f;
-		//		}
-		//	}
-		//);
-
-		// 隐藏光标
-		//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-		glfwSetCursorPosCallback(window,
-			[](GLFWwindow* window, double xpos, double ypos)
+			else if (sceneFileExists)
 			{
-				// 取回缩放变量的地址
-				InputState* input = static_cast<InputState*>(
-					glfwGetWindowUserPointer(window)
-					);
-
-				if (!input->cameraControlActive)
+				if (LoadScene(sceneFilePath, scene))
 				{
-					//没有控制相机的时候，重置
-					input->firstMouse = true;
-					return;
-				}
-
-				if (input->firstMouse)
-				{
-					input->lastMouseX = xpos;
-					input->lastMouseY = ypos;
-					input->firstMouse = false;
-					return;
-				}
-
-				const float offsetX = static_cast<float>(xpos - input->lastMouseX);
-				const float offsetY = static_cast<float>(input->lastMouseY - ypos);
-
-				input->lastMouseX = xpos;
-				input->lastMouseY = ypos;
-
-				input->camera->Rotate(offsetX, offsetY);
-			}
-		);
-
-		std::size_t selectedObjectIndex = 0;
-
-		// 显示鼠标
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-
-		// 创建Framebuffer
-		Framebuffer sceneFramebuffer(800, 600);
-		if(!sceneFramebuffer.IsValid())
-		{ 
-			std::cerr << "Failed to create scene framebuffer\n";
-			return -1;
-		}
-
-		// 创建Imgui上下文
-		IMGUI_CHECKVERSION();
-		ImGui::CreateContext();
-
-		// 开启面板停靠
-		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-		//使用深色的界面
-		ImGui::StyleColorsDark();
-
-		//DPI的适配
-		// 获取窗体所在屏幕的显示缩放比例
-		const float uiScale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
-
-		ImGuiStyle& style = ImGui::GetStyle();
-		style.ScaleAllSizes(uiScale);	// 空间间距，边距等尺寸
-		style.FontScaleDpi = uiScale;	// 字体大小
-
-		//连接GLFW和OPENGL后端
-		ImGui_ImplGlfw_InitForOpenGL(window, true);
-		ImGui_ImplOpenGL3_Init("#version 330 core");
-
-		std::string sceneSaveMessage;
-		bool loadSceneRequested = false;
-
-		// 资产目录
-		const std::filesystem::path assetRoot = STARGATE_ASSET_DIR;
-		std::filesystem::path currentAssetDirectory = assetRoot;
-
-		// 主循环
-		while (!glfwWindowShouldClose(window))
-		{
-			// 记录本次循环的开始时间
-			const double frameStartTime = glfwGetTime();
-
-			if (loadSceneRequested)
-			{
-				loadSceneRequested = false;
-
-				SceneData loadedScene;
-
-				if (!LoadScene(sceneFilePath, loadedScene))
-				{
-					sceneSaveMessage = "Load failed. Check console.";
+					std::cout << "Scene loaded.\n";
 				}
 				else
 				{
-					const std::string loadedModelPath =
-						std::string(STARGATE_ASSET_DIR) + "/" +
-						loadedScene.modelPath;
+					std::cerr << "Using default scene.\n";
+				}
+			}
 
-					auto loadedModel =
-						std::make_unique<Model>(loadedModelPath.c_str());
+			// 根据场景里的模型路径加载模型
+			//const std::string modelFullPath = std::string(STARGATE_ASSET_DIR) + "/" + scene.modelPath;
 
-					if (!loadedModel->IsValid())
+			// 使用unique 为了在运行中加载场景时，能够替换当前模型，并自动释放旧模型
+			// 赋值转移的是指针的所有权，不需要复制或移动 Model 对象本身
+			//model 释放旧模型 → 接管新模型
+			// loadedModel     → 变为空指针
+			//auto model = std::make_unique<Model>(modelFullPath.c_str());
+
+			//if (!model->IsValid())
+			//{
+			//	std::cerr << "Failed to create model"<< std::endl;
+			//	return -1;
+			//}
+
+			ModelCache models;
+			if (!LoadSceneModels(scene, models))
+			{
+				std::cerr << "Failed to load scene models\n";
+				return -1;
+			}
+
+			shader.Bind();
+			shader.SetInt("uTexture", 0);
+
+			// ------------------------光照信息-----------------------------------------
+			glm::vec3 toLightDirection(-0.6f, 0.8f, 1.0f);
+			glm::vec3 lightColor(1.0f, 0.96f, 0.9f);
+			float ambientStrength = 0.22f;
+			// ------------------------光照信息 END-----------------------------------------
+
+			const bool timerResolutionEnabled = timeBeginPeriod(1) == TIMERR_NOERROR; // 设置系统定时器分辨率为1ms
+			lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
+
+			const float moveSpeed = 0.8f; // 偏移量变化速度
+			const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
+
+			Camera camera;
+			InputState inputState;
+			inputState.camera = &camera;
+
+			glfwSetWindowUserPointer(window, &inputState); // 将缩放因子指针存储在窗口的用户指针中
+
+			//glfwSetScrollCallback(
+			//	window,
+			//	[](GLFWwindow* window, double, double yoffset)
+			//	{
+			//		InputState* input = static_cast<InputState*>(
+			//			glfwGetWindowUserPointer(window)
+			//			);
+
+			//		input->scaleFactor += static_cast<float>(yoffset) * 0.1f;
+
+			//		if (input->scaleFactor < 0.1f)
+			//		{
+			//			input->scaleFactor = 0.1f;
+			//		}
+			//	}
+			//);
+
+			// 隐藏光标
+			//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+			glfwSetCursorPosCallback(window,
+				[](GLFWwindow* window, double xpos, double ypos)
+				{
+					// 取回缩放变量的地址
+					InputState* input = static_cast<InputState*>(
+						glfwGetWindowUserPointer(window)
+						);
+
+					if (!input->cameraControlActive)
 					{
-						sceneSaveMessage = "Model load failed. Check console.";
+						//没有控制相机的时候，重置
+						input->firstMouse = true;
+						return;
+					}
+
+					if (input->firstMouse)
+					{
+						input->lastMouseX = xpos;
+						input->lastMouseY = ypos;
+						input->firstMouse = false;
+						return;
+					}
+
+					const float offsetX = static_cast<float>(xpos - input->lastMouseX);
+					const float offsetY = static_cast<float>(input->lastMouseY - ypos);
+
+					input->lastMouseX = xpos;
+					input->lastMouseY = ypos;
+
+					input->camera->Rotate(offsetX, offsetY);
+				}
+			);
+
+			std::size_t selectedObjectIndex = 0;
+
+			// 显示鼠标
+			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+			// 创建Framebuffer
+			Framebuffer sceneFramebuffer(800, 600);
+			if (!sceneFramebuffer.IsValid())
+			{
+				std::cerr << "Failed to create scene framebuffer\n";
+				return -1;
+			}
+
+			// 创建Imgui上下文
+			IMGUI_CHECKVERSION();
+			ImGui::CreateContext();
+
+			// 开启面板停靠
+			ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+			//使用深色的界面
+			ImGui::StyleColorsDark();
+
+			//DPI的适配
+			// 获取窗体所在屏幕的显示缩放比例
+			const float uiScale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
+
+			ImGuiStyle& style = ImGui::GetStyle();
+			style.ScaleAllSizes(uiScale);	// 空间间距，边距等尺寸
+			style.FontScaleDpi = uiScale;	// 字体大小
+
+			//连接GLFW和OPENGL后端
+			ImGui_ImplGlfw_InitForOpenGL(window, true);
+			ImGui_ImplOpenGL3_Init("#version 330 core");
+
+			std::string sceneSaveMessage;
+			bool loadSceneRequested = false;
+			std::string pendingModelPath;
+
+			// 资产目录
+			const std::filesystem::path assetRoot = STARGATE_ASSET_DIR;
+			std::filesystem::path currentAssetDirectory = assetRoot;
+
+			// 主循环
+			while (!glfwWindowShouldClose(window))
+			{
+				// 记录本次循环的开始时间
+				const double frameStartTime = glfwGetTime();
+
+				if (loadSceneRequested)
+				{
+					loadSceneRequested = false;
+
+					SceneData loadedScene;
+					ModelCache loadedModels;
+
+					if (!LoadScene(sceneFilePath, loadedScene) ||
+						!LoadSceneModels(loadedScene, loadedModels))
+					{
+						sceneSaveMessage = "Load failed. Check console.";
 					}
 					else
 					{
-						// 场景数据和模型都准备好后，再替换当前状态
+						//const std::string loadedModelPath =
+						//	std::string(STARGATE_ASSET_DIR) + "/" +
+						//	loadedScene.modelPath;
+
+						//auto loadedModel =
+						//	std::make_unique<Model>(loadedModelPath.c_str());
+
+						//if (!loadedModel->IsValid())
+						//{
+						//	sceneSaveMessage = "Model load failed. Check console.";
+						//}
+						//else
+						//{
+						//	// 场景数据和模型都准备好后，再替换当前状态
+						//	scene = std::move(loadedScene);
+						//	//会完成三件事：
+						//	//	1. 删除 model 原来拥有的旧 Model 对象，调用它的析构函数。
+						//	//	2. model 接管 loadedModel 拥有的新对象。
+						//	//	3. loadedModel 变为空指针。
+						//	model = std::move(loadedModel);
+
+						//	selectedObjectIndex = 0;
+
 						scene = std::move(loadedScene);
-						//会完成三件事：
-						//	1. 删除 model 原来拥有的旧 Model 对象，调用它的析构函数。
-						//	2. model 接管 loadedModel 拥有的新对象。
-						//	3. loadedModel 变为空指针。
-						model = std::move(loadedModel);
-
+						models = std::move(loadedModels);
 						selectedObjectIndex = 0;
-
 						sceneSaveMessage = "Scene loaded.";
 					}
+					// 加载可能耗时，避免后面的移动使用过大的时间间隔
+					lastTime = glfwGetTime();
 				}
 
-				// 加载可能耗时，避免后面的移动使用过大的时间间隔
-				lastTime = glfwGetTime();
-			}
-
-			glfwPollEvents(); // 立即处理所有挂起的事件
-
-			// 计算本次循环与上次循环的时间差
-			const double currentTime = glfwGetTime();
-			const double deltaTime = currentTime - lastTime;
-			lastTime = currentTime;
-
-			// static_cast<float> 将 double 类型的 deltaTime 转换为 float 类型，以便与 moveSpeed 相乘
-			const float moveDistance = moveSpeed * static_cast<float>(deltaTime);
-
-			// 输入处理
-			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-			{
-				glfwSetWindowShouldClose(window, GLFW_TRUE);
-			}
-
-			if (!ImGui::GetIO().WantCaptureKeyboard)
-			{
-				if (selectedObjectIndex < scene.objects.size())
+				if (!pendingModelPath.empty())
 				{
-					SceneObject& ketboardObject = scene.objects[selectedObjectIndex];
+					const std::string modelPath = std::move(pendingModelPath);
+					pendingModelPath.clear();
 
-					if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+					if (EnsureModelLoaded(modelPath, models))
 					{
-						ketboardObject.position.x -= moveDistance;
-					}
+						SceneObject object;
 
-					if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-					{
-						ketboardObject.position.x += moveDistance;
-					}
-
-					const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
-					if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-					{
-						ketboardObject.rotation.y += rotationStep; // 逆时针旋转
-					}
-					if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-					{
-						ketboardObject.rotation.y -= rotationStep; // 顺时针旋转
-					}
-				}
-
-
-				// 切换灯光颜色
-				if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
-				{
-					lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 白光
-				}
-				else if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
-				{
-					lightColor = glm::vec3(1.0f, 0.8f, 0.5f); // 暖色
-				}
-				else if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
-				{
-					lightColor = glm::vec3(0.4f, 0.7f, 1.0f); // 冷色
-				}
-
-				float forward = 0.0f;
-				float right = 0.0f;
-
-				if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-				{
-					forward += 1.0f;
-				}
-
-				if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-				{
-					forward -= 1.0f;
-				}
-
-				if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-				{
-					right -= 1.0f;
-				}
-
-				if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-				{
-					right += 1.0f;
-				}
-
-				camera.Move(forward, right, static_cast<float>(deltaTime));
-			}
-
-			// 渲染开始
-			// 获取实际绘图区域的宽度和高度
-			int framebufferWidth = 0;
-			int framebufferHeight = 0;
-			glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
-
-			// 最小化等情况下，绘图区域可能为0，暂时跳过绘制
-			if (framebufferWidth == 0 || framebufferHeight == 0)
-			{
-				// 休眠一小段时间，避免CPU空转
-				std::this_thread::sleep_for(std::chrono::milliseconds(16));
-				continue;
-			}
-
-			// 开始新的一帧
-			ImGui_ImplOpenGL3_NewFrame();
-			ImGui_ImplGlfw_NewFrame();
-			ImGui::NewFrame();
-
-			if (!ImGui::GetIO().WantCaptureKeyboard &&
-				ImGui::IsKeyPressed(ImGuiKey_Delete, false) &&
-				selectedObjectIndex < scene.objects.size())
-			{
-				scene.objects.erase(
-					scene.objects.begin() +
-					static_cast<std::ptrdiff_t>(selectedObjectIndex)
-				);
-
-				// 删除最后一个物体后，暂时将索引保持为 0；
-				// 后续必须检查是否存在选中物体
-				if (scene.objects.empty())
-				{
-					selectedObjectIndex = 0;
-				}
-				else if (selectedObjectIndex >= scene.objects.size())
-				{
-					selectedObjectIndex = scene.objects.size() - 1;
-				}
-
-				sceneSaveMessage = "Object deleted. Save Scene to keep changes.";
-			}
-
-			// 顶层菜单
-			if (ImGui::BeginMainMenuBar())
-			{
-				if (ImGui::BeginMenu("File"))
-				{
-					if (ImGui::MenuItem("Save Scene"))
-					{
-						const bool saved = SaveScene(
-							sceneFilePath,
-							scene.modelPath.c_str(),
-							scene.objects.data(),
-							scene.objects.size()
+						object.name = PathToUtf8(
+							std::filesystem::u8path(modelPath).stem()
 						);
 
-						sceneSaveMessage = saved
-							? "Scene saved."
-							: "Save failed. Check console.";
+						object.modelPath = modelPath;
+						object.position = glm::vec3(0.0f);
+						object.rotation = glm::vec3(0.0f);
+						object.scale = glm::vec3(1.0f);
+
+						scene.objects.push_back(std::move(object));
+						selectedObjectIndex = scene.objects.size() - 1;
+
+						sceneSaveMessage = "Object created.";
+					}
+					else
+					{
+						sceneSaveMessage = "Model load failed. Check console.";
 					}
 
-					if (ImGui::MenuItem("Load Scene"))
+					lastTime = glfwGetTime();
+				}
+
+				glfwPollEvents(); // 立即处理所有挂起的事件
+
+				// 计算本次循环与上次循环的时间差
+				const double currentTime = glfwGetTime();
+				const double deltaTime = currentTime - lastTime;
+				lastTime = currentTime;
+
+				// static_cast<float> 将 double 类型的 deltaTime 转换为 float 类型，以便与 moveSpeed 相乘
+				const float moveDistance = moveSpeed * static_cast<float>(deltaTime);
+
+				// 输入处理
+				if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+				{
+					glfwSetWindowShouldClose(window, GLFW_TRUE);
+				}
+
+				if (!ImGui::GetIO().WantCaptureKeyboard)
+				{
+					if (selectedObjectIndex < scene.objects.size())
 					{
-						loadSceneRequested = true;
-						sceneSaveMessage = "Loading scene...";
+						SceneObject& ketboardObject = scene.objects[selectedObjectIndex];
+
+						if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+						{
+							ketboardObject.position.x -= moveDistance;
+						}
+
+						if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+						{
+							ketboardObject.position.x += moveDistance;
+						}
+
+						const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
+						if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+						{
+							ketboardObject.rotation.y += rotationStep; // 逆时针旋转
+						}
+						if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+						{
+							ketboardObject.rotation.y -= rotationStep; // 顺时针旋转
+						}
+					}
+
+
+					// 切换灯光颜色
+					if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+					{
+						lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 白光
+					}
+					else if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+					{
+						lightColor = glm::vec3(1.0f, 0.8f, 0.5f); // 暖色
+					}
+					else if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+					{
+						lightColor = glm::vec3(0.4f, 0.7f, 1.0f); // 冷色
+					}
+
+					float forward = 0.0f;
+					float right = 0.0f;
+
+					if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+					{
+						forward += 1.0f;
+					}
+
+					if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+					{
+						forward -= 1.0f;
+					}
+
+					if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+					{
+						right -= 1.0f;
+					}
+
+					if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+					{
+						right += 1.0f;
+					}
+
+					camera.Move(forward, right, static_cast<float>(deltaTime));
+				}
+
+				// 渲染开始
+				// 获取实际绘图区域的宽度和高度
+				int framebufferWidth = 0;
+				int framebufferHeight = 0;
+				glfwGetFramebufferSize(window, &framebufferWidth, &framebufferHeight);
+
+				// 最小化等情况下，绘图区域可能为0，暂时跳过绘制
+				if (framebufferWidth == 0 || framebufferHeight == 0)
+				{
+					// 休眠一小段时间，避免CPU空转
+					std::this_thread::sleep_for(std::chrono::milliseconds(16));
+					continue;
+				}
+
+				// 开始新的一帧
+				ImGui_ImplOpenGL3_NewFrame();
+				ImGui_ImplGlfw_NewFrame();
+				ImGui::NewFrame();
+
+				if (!ImGui::GetIO().WantCaptureKeyboard &&
+					ImGui::IsKeyPressed(ImGuiKey_Delete, false) &&
+					selectedObjectIndex < scene.objects.size())
+				{
+					scene.objects.erase(
+						scene.objects.begin() +
+						static_cast<std::ptrdiff_t>(selectedObjectIndex)
+					);
+
+					// 删除最后一个物体后，暂时将索引保持为 0；
+					// 后续必须检查是否存在选中物体
+					if (scene.objects.empty())
+					{
+						selectedObjectIndex = 0;
+					}
+					else if (selectedObjectIndex >= scene.objects.size())
+					{
+						selectedObjectIndex = scene.objects.size() - 1;
+					}
+
+					sceneSaveMessage = "Object deleted. Save Scene to keep changes.";
+				}
+
+				// 顶层菜单
+				if (ImGui::BeginMainMenuBar())
+				{
+					if (ImGui::BeginMenu("File"))
+					{
+						if (ImGui::MenuItem("Save Scene"))
+						{
+							const bool saved = SaveScene(
+								sceneFilePath,
+								scene.modelPath.c_str(),
+								scene.objects.data(),
+								scene.objects.size()
+							);
+
+							sceneSaveMessage = saved
+								? "Scene saved."
+								: "Save failed. Check console.";
+						}
+
+						if (ImGui::MenuItem("Load Scene"))
+						{
+							loadSceneRequested = true;
+							sceneSaveMessage = "Loading scene...";
+						}
+
+						ImGui::Separator();
+
+						if (ImGui::MenuItem("Exit"))
+						{
+							glfwSetWindowShouldClose(window, GLFW_TRUE);
+						}
+
+						ImGui::EndMenu();
+					}
+
+					ImGui::EndMainMenuBar();
+				}
+
+				// 在主窗口的工作区域创建停靠空间
+				//ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
+				const ImGuiViewport* viewport = ImGui::GetMainViewport();
+				const ImGuiID dockspaceID = ImGui::GetID("StarGateDockSpaceV3");
+				if (ImGui::DockBuilderGetNode(dockspaceID) == nullptr)
+				{
+					ImGui::DockBuilderAddNode(
+						dockspaceID,
+						ImGuiDockNodeFlags_DockSpace
+					);
+
+					ImGui::DockBuilderSetNodeSize(dockspaceID, viewport->WorkSize);
+
+					ImGuiID centerID = dockspaceID;
+					ImGuiID leftID = 0;
+					ImGuiID rightID = 0;
+
+					// 从整个区域切出左侧 12%
+					ImGui::DockBuilderSplitNode(
+						centerID,
+						ImGuiDir_Left,
+						0.12f,
+						&leftID,
+						&centerID
+					);
+
+					// 从剩余区域切出右侧 23%，约占整个区域的 20%
+					ImGui::DockBuilderSplitNode(
+						centerID,
+						ImGuiDir_Right,
+						0.23f,
+						&rightID,
+						&centerID
+					);
+
+					ImGuiID hierarchyID = 0;
+					ImGuiID assetsID = 0;
+					// 将左侧区域上下各分一半
+					ImGui::DockBuilderSplitNode(
+						leftID,
+						ImGuiDir_Up,
+						0.5f,
+						&hierarchyID,
+						&assetsID
+					);
+
+					// 将面板放入对应区域，名称必须与 Begin() 中一致
+					ImGui::DockBuilderDockWindow("Hierarchy", hierarchyID);
+					ImGui::DockBuilderDockWindow("Assets", assetsID);
+					ImGui::DockBuilderDockWindow("Inspector", rightID);
+					ImGui::DockBuilderDockWindow("Scene", centerID);
+
+					ImGui::DockBuilderFinish(dockspaceID);
+				}
+
+				// 每帧提交停靠区域
+				ImGui::DockSpaceOverViewport(dockspaceID, viewport);
+
+				const ImGuiIO& io = ImGui::GetIO();
+				//ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
+				//ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
+				if (ImGui::Begin("Hierarchy"))
+				{
+					for (std::size_t i = 0; i < scene.objects.size(); ++i)
+					{
+						ImGui::PushID(static_cast<int>(i)); //后面的控件生成 ID 时包含,它需要成对使用，否则这个索引会继续影响后面的控件。
+
+						const bool selected = (i == selectedObjectIndex);
+
+						if (ImGui::Selectable(scene.objects[i].name.c_str(), selected))
+						{
+							selectedObjectIndex = i;
+						}
+
+						ImGui::PopID();
+					}
+				}
+				ImGui::End();
+
+				if (ImGui::Begin("Assets"))
+				{
+					// 根目录时禁止继续向上返回
+					ImGui::BeginDisabled(currentAssetDirectory == assetRoot);
+
+					if (ImGui::Button("Up"))
+					{
+						currentAssetDirectory = currentAssetDirectory.parent_path();
+					}
+
+					ImGui::EndDisabled();
+
+					const std::filesystem::path relativePath = currentAssetDirectory.lexically_relative(assetRoot);
+					const std::string directoryLabel = currentAssetDirectory == assetRoot
+						? "assets"
+						: "assets/" + PathToUtf8(relativePath);
+
+					ImGui::TextWrapped("%s", directoryLabel.c_str());
+					ImGui::Separator();
+
+					std::error_code error;
+					std::filesystem::directory_iterator iterator(currentAssetDirectory, error);
+					const std::filesystem::directory_iterator end;
+					for (; !error && iterator != end; iterator.increment(error))
+					{
+						const std::filesystem::directory_entry& entry = *iterator;
+						const bool isDirectory = entry.is_directory(error);
+
+						if (error)
+						{
+							break;
+						}
+
+						const std::string filename = PathToUtf8(entry.path().filename());
+						const std::string label =
+							isDirectory ? "[Dir] " + filename : filename;
+
+						const std::string itemID = PathToUtf8(entry.path());
+						ImGui::PushID(itemID.c_str());
+
+						const bool clicked = ImGui::Selectable(
+							label.c_str(),
+							false,
+							ImGuiSelectableFlags_AllowDoubleClick
+						);
+
+						const bool doubleClicked =
+							clicked &&
+							ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+						ImGui::PopID();
+
+						if (doubleClicked)
+						{
+							if (isDirectory)
+							{
+								currentAssetDirectory = entry.path();
+								break;
+							}
+
+							if (IsModelFile(entry.path()))
+							{
+								pendingModelPath = PathToUtf8(
+									entry.path().lexically_relative(assetRoot)
+								);
+
+								sceneSaveMessage = "Loading model...";
+								break;
+							}
+						}
+					}
+
+					if (error)
+					{
+						ImGui::TextWrapped("Cannot read directory: %s",
+							error.message().c_str());
+					}
+				}
+				ImGui::End();
+
+				// 在列表处理之后取得选中物体
+				//此时只是生成界面，实际绘制放在后面。
+				//ImGui::ShowDemoWindow();
+				//ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
+				//ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale), ImGuiCond_FirstUseEver);
+
+				if (ImGui::Begin("Inspector"))
+				{
+					if (selectedObjectIndex < scene.objects.size())
+					{
+						SceneObject& selectedObject = scene.objects[selectedObjectIndex];
+
+						ImGui::Text(
+							"Selected: %s",
+							selectedObject.name.c_str()
+						);
+
+						ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
+						ImGui::DragFloat3("Rotation", glm::value_ptr(selectedObject.rotation), 0.5f);
+						ImGui::DragFloat3("Scale", glm::value_ptr(selectedObject.scale), 0.01f, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+
+						if (ImGui::Button("Reset Transform"))
+						{
+							selectedObject.position = glm::vec3(0.0f);
+							selectedObject.rotation = glm::vec3(0.0f);
+							selectedObject.scale = glm::vec3(1.0f);
+						}
+					}
+					else
+					{
+						ImGui::TextUnformatted("No object selected.");
 					}
 
 					ImGui::Separator();
 
-					if (ImGui::MenuItem("Exit"))
+					if (!sceneSaveMessage.empty())
 					{
-						glfwSetWindowShouldClose(window, GLFW_TRUE);
+						ImGui::TextWrapped("%s", sceneSaveMessage.c_str());
 					}
 
-					ImGui::EndMenu();
+					ImGui::Separator();
+					ImGui::Text("Lighting");
+
+					ImGui::ColorEdit3("Light Color", glm::value_ptr(lightColor));
+					ImGui::SliderFloat("Ambient", &ambientStrength, 0.0f, 1.0f);
+
+					ImGui::Separator();
+					ImGui::Text("FPS:%.1f", ImGui::GetIO().Framerate);
 				}
+				ImGui::End();
 
-				ImGui::EndMainMenuBar();
-			}
+				// IMGUI的Scene视图
+				bool sceneHovered = false;
+				bool sceneImageVisible = false;
 
-			// 在主窗口的工作区域创建停靠空间
-			//ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
-			const ImGuiViewport* viewport = ImGui::GetMainViewport();
-			const ImGuiID dockspaceID = ImGui::GetID("StarGateDockSpaceV3");
-			if (ImGui::DockBuilderGetNode(dockspaceID) == nullptr)
-			{
-				ImGui::DockBuilderAddNode(
-					dockspaceID,
-					ImGuiDockNodeFlags_DockSpace
-				);
-
-				ImGui::DockBuilderSetNodeSize(dockspaceID, viewport->WorkSize);
-
-				ImGuiID centerID = dockspaceID;
-				ImGuiID leftID = 0;
-				ImGuiID rightID = 0;
-
-				// 从整个区域切出左侧 12%
-				ImGui::DockBuilderSplitNode(
-					centerID,
-					ImGuiDir_Left,
-					0.12f,
-					&leftID,
-					&centerID
-				);
-
-				// 从剩余区域切出右侧 23%，约占整个区域的 20%
-				ImGui::DockBuilderSplitNode(
-					centerID,
-					ImGuiDir_Right,
-					0.23f,
-					&rightID,
-					&centerID
-				);
-
-				ImGuiID hierarchyID = 0;
-				ImGuiID assetsID = 0;
-				// 将左侧区域上下各分一半
-				ImGui::DockBuilderSplitNode(
-					leftID,
-					ImGuiDir_Up,
-					0.5f,
-					&hierarchyID,
-					&assetsID
-				);
-
-				// 将面板放入对应区域，名称必须与 Begin() 中一致
-				ImGui::DockBuilderDockWindow("Hierarchy", hierarchyID);
-				ImGui::DockBuilderDockWindow("Assets", assetsID);
-				ImGui::DockBuilderDockWindow("Inspector", rightID);
-				ImGui::DockBuilderDockWindow("Scene", centerID);
-
-				ImGui::DockBuilderFinish(dockspaceID);
-			}
-
-			// 每帧提交停靠区域
-			ImGui::DockSpaceOverViewport(dockspaceID, viewport);
-
-			const ImGuiIO& io = ImGui::GetIO();
-			//ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
-			//ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
-			if (ImGui::Begin("Hierarchy"))
-			{
-				for (std::size_t i = 0; i < scene.objects.size(); ++i)
+				//::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_FirstUseEver);
+				if (ImGui::Begin("Scene", nullptr,
+					ImGuiWindowFlags_NoScrollbar |
+					ImGuiWindowFlags_NoScrollWithMouse))
 				{
-					ImGui::PushID(static_cast<int>(i)); //后面的控件生成 ID 时包含,它需要成对使用，否则这个索引会继续影响后面的控件。
+					// 面板中的剩余可用空间
+					const ImVec2 sceneSize = ImGui::GetContentRegionAvail();
 
-					const bool selected = (i == selectedObjectIndex);
+					// 将界面尺寸转换成实际图像的像素尺寸
+					const int sceneWidth = static_cast<int>(sceneSize.x * io.DisplayFramebufferScale.x);
+					const int sceneHeight = static_cast<int>(sceneSize.y * io.DisplayFramebufferScale.y);
 
-					if (ImGui::Selectable(scene.objects[i].name.c_str(), selected))
+					if (sceneWidth > 0 && sceneHeight > 0)
 					{
-						selectedObjectIndex = i;
+						sceneFramebuffer.Resize(sceneWidth, sceneHeight);
+
+						const ImTextureRef sceneTexture(
+							static_cast<ImTextureID>(sceneFramebuffer.GetColorTexture())
+						);
+
+						ImGui::Image(sceneTexture, sceneSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+						sceneHovered = ImGui::IsItemHovered();
+						sceneImageVisible = true;	//如果 Scene 面板折叠了，或者内部没有足够的显示空间，这段代码不会执行，变量就保持 false。
 					}
-
-					ImGui::PopID();
 				}
-			}
-			ImGui::End();
+				ImGui::End();
 
-			if (ImGui::Begin("Assets"))
-			{
-				// 根目录时禁止继续向上返回
-				ImGui::BeginDisabled(currentAssetDirectory == assetRoot);
+				// 鼠标的处理
+				const bool windowFocused = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
+				const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
 
-				if (ImGui::Button("Up"))
+				//在Scene场景里按下才算开始控制相机
+				const bool startCameraControl = sceneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+
+				// 已经开始控制后，保持到松开右键
+				const bool enableCamera =
+					windowFocused &&
+					sceneImageVisible &&
+					rightMouseDown &&
+					(inputState.cameraControlActive || startCameraControl);
+
+				if (enableCamera != inputState.cameraControlActive)
 				{
-					currentAssetDirectory = currentAssetDirectory.parent_path();
-				}
+					inputState.cameraControlActive = enableCamera;
+					inputState.firstMouse = true;
 
-				ImGui::EndDisabled();
-
-				const std::filesystem::path relativePath = currentAssetDirectory.lexically_relative(assetRoot);
-				const std::string directoryLabel = currentAssetDirectory == assetRoot
-					? "assets"
-					: "assets/" + PathToUtf8(relativePath);
-
-				ImGui::TextWrapped("%s", directoryLabel.c_str());
-				ImGui::Separator();
-
-				std::error_code error;
-				std::filesystem::directory_iterator iterator( currentAssetDirectory, error);
-				const std::filesystem::directory_iterator end;
-				for (; !error && iterator != end; iterator.increment(error))
-				{
-					const std::filesystem::directory_entry& entry = *iterator;
-					const bool isDirectory = entry.is_directory(error);
-
-					if (error)
-					{
-						break;
-					}
-
-					const std::string filename = PathToUtf8(entry.path().filename());
-					const std::string label =
-						isDirectory ? "[Dir] " + filename : filename;
-
-					const std::string itemID = PathToUtf8(entry.path());
-					ImGui::PushID(itemID.c_str());
-
-					const bool clicked = ImGui::Selectable(
-						label.c_str(),
-						false,
-						ImGuiSelectableFlags_AllowDoubleClick
+					glfwSetInputMode(
+						window,
+						GLFW_CURSOR,
+						enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
 					);
-
-					const bool openDirectory =
-						clicked &&
-						isDirectory &&
-						ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
-
-					ImGui::PopID();
-
-					if (openDirectory)
-					{
-						currentAssetDirectory = entry.path();
-						break;
-					}
 				}
 
-				if (error)
+				// 鼠标位于场景画面上时，滚轮缩放选中的物体
+				if (windowFocused && sceneHovered && selectedObjectIndex < scene.objects.size())
 				{
-					ImGui::TextWrapped("Cannot read directory: %s",
-						error.message().c_str());
+					SceneObject& scrollObject = scene.objects[selectedObjectIndex];
+
+					scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
+					scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
 				}
-			}
-			ImGui::End();
 
-			// 在列表处理之后取得选中物体
-			//此时只是生成界面，实际绘制放在后面。
-			//ImGui::ShowDemoWindow();
-			//ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
-			//ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale), ImGuiCond_FirstUseEver);
+				const float aspectRatio = static_cast<float>(sceneFramebuffer.GetWidth()) / static_cast<float>(sceneFramebuffer.GetHeight());
+				// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
+				//const glm::mat4 projection = glm::ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f);
 
-			if (ImGui::Begin("Inspector"))
-			{
-				if (selectedObjectIndex < scene.objects.size())
+				// OpenGL 右手系，默认朝向-z方向
+				// Unity 左手系
+				const glm::mat4 projection = glm::perspective(
+					glm::radians(45.0f), // 视野角度，单位为弧度
+					aspectRatio,
+					0.1f,
+					100.0f // 近平面和远平面距离
+				); // 透视投影矩阵
+
+				//const glm::mat4 view = glm::translate(
+				//	glm::mat4(1.0f),  // 初始化为单位矩阵
+				//	glm::vec3(0.0f, 0.0f, -3.0f) // 将相机向后移动3个单位，相当于003
+				//); // 视图矩阵，向后移动相机
+
+				const glm::mat4 view = camera.GetViewMatrix();
+
+				// 设置绘图区域
+				sceneFramebuffer.Bind();
+
+				// 用前面的颜色清除屏幕 包括深度缓存
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+				shader.Bind();
+				shader.SetFloat("uAmbientStrength", ambientStrength);
+				shader.SetFloat("uSpecularStrength", 0.18f);
+				shader.SetFloat("uShininess", 64.0f);
+
+				shader.SetVec3("uToLightDirection", toLightDirection);
+				shader.SetVec3("uLightColor", lightColor);
+				shader.SetVec3("uCameraPosition", camera.GetPosition());
+
+				shader.SetMat4("uView", view);
+				shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
+
+				for (const SceneObject& object : scene.objects)
 				{
-					SceneObject& selectedObject = scene.objects[selectedObjectIndex];
+					glm::mat4 transform(1.0f);
 
-					ImGui::Text(
-						"Selected: %s",
-						selectedObject.name.c_str()
-					);
+					transform = glm::translate(transform, object.position);
 
-					ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
-					ImGui::DragFloat3("Rotation", glm::value_ptr(selectedObject.rotation), 0.5f);
-					ImGui::DragFloat3("Scale", glm::value_ptr(selectedObject.scale), 0.01f, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+					transform = glm::rotate(transform, glm::radians(object.rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+					//glm::radians(rotationAngle) 将角度转换为弧度，因为glm::rotate函数需要弧度值
+					// glm::vec3(0, 0, 1) 表示绕Z轴旋转，这里假设三角形在XY平面上
+					transform = glm::rotate(transform, glm::radians(object.rotation.x), glm::vec3(1, 0, 0));
+					transform = glm::rotate(transform, glm::radians(object.rotation.z), glm::vec3(0.0f, 0.0f, 1.0f));
+					transform = glm::scale(transform, object.scale);
 
-					if (ImGui::Button("Reset Transform"))
-					{
-						selectedObject.position = glm::vec3(0.0f);
-						selectedObject.rotation = glm::vec3(0.0f);
-						selectedObject.scale = glm::vec3(1.0f);
-					}
+					shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
+					const std::string& modelPath = GetObjectModelPath(scene, object);
+					models.at(modelPath)->Draw(shader);
 				}
-				else
+
+				Framebuffer::Unbind();
+				//恢复窗口的视图大小
+				glViewport(0, 0, framebufferWidth, framebufferHeight);
+				// 清除窗口背景
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+				// IMGUI界面绘制顺序
+				ImGui::Render();
+
+				//绘制在3维场景上方
+				ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+				// 把这一帧的渲染结果显示到屏幕上
+				glfwSwapBuffers(window);
+				// 渲染结束
+
+				// 累计统计数据
+				accumulatedTime += deltaTime;
+				++frameCount;
+
+				// 每0.5秒更新一次窗口标题，显示FPS
+				if (accumulatedTime >= 0.5)
 				{
-					ImGui::TextUnformatted("No object selected.");
+					const double fps = frameCount / accumulatedTime;
+					const double averageFrameMs = accumulatedTime / frameCount * 1000.0;
+
+					std::ostringstream title;
+					title << "StarGate | "
+						<< std::fixed << std::setprecision(1)
+						<< fps << " FPS | "
+						<< std::setprecision(2)
+						<< averageFrameMs << " ms";
+
+					glfwSetWindowTitle(window, title.str().c_str());
+
+					// 重置计数器
+					accumulatedTime = 0.0;
+					frameCount = 0;
 				}
 
-				ImGui::Separator();
+				// 计算本帧的工作时间
+				const double frameWorkTime = glfwGetTime() - frameStartTime;
+				const double remainingTime = targetFrameTime - frameWorkTime;
 
-				if (!sceneSaveMessage.empty())
+				//工作完成较快的时候，等待剩余时间，尽量接近目标帧率
+				if (remainingTime > 0.0)
 				{
-					ImGui::TextWrapped("%s", sceneSaveMessage.c_str());
-				}
-
-				ImGui::Separator();
-				ImGui::Text("Lighting");
-
-				ImGui::ColorEdit3("Light Color", glm::value_ptr(lightColor));
-				ImGui::SliderFloat("Ambient", &ambientStrength, 0.0f, 1.0f);
-
-				ImGui::Separator();
-				ImGui::Text("FPS:%.1f", ImGui::GetIO().Framerate);
-			}
-			ImGui::End();
-
-			// IMGUI的Scene视图
-			bool sceneHovered = false;
-			bool sceneImageVisible = false;
-
-			//::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_FirstUseEver);
-			if (ImGui::Begin("Scene", nullptr,
-				ImGuiWindowFlags_NoScrollbar |
-				ImGuiWindowFlags_NoScrollWithMouse))
-			{
-				// 面板中的剩余可用空间
-				const ImVec2 sceneSize = ImGui::GetContentRegionAvail();
-
-				// 将界面尺寸转换成实际图像的像素尺寸
-				const int sceneWidth = static_cast<int>(sceneSize.x * io.DisplayFramebufferScale.x);
-				const int sceneHeight = static_cast<int>(sceneSize.y * io.DisplayFramebufferScale.y);
-
-				if (sceneWidth > 0 && sceneHeight > 0)
-				{
-					sceneFramebuffer.Resize(sceneWidth, sceneHeight);
-
-					const ImTextureRef sceneTexture(
-						static_cast<ImTextureID>(sceneFramebuffer.GetColorTexture())
-					);
-
-					ImGui::Image(sceneTexture, sceneSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
-
-					sceneHovered = ImGui::IsItemHovered();
-					sceneImageVisible = true;	//如果 Scene 面板折叠了，或者内部没有足够的显示空间，这段代码不会执行，变量就保持 false。
+					//chrono::duration 将double转换成表示时间的类型
+					std::this_thread::sleep_for(std::chrono::duration<double>(remainingTime));
 				}
 			}
-			ImGui::End();
 
-			// 鼠标的处理
-			const bool windowFocused = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
-			const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-
-			//在Scene场景里按下才算开始控制相机
-			const bool startCameraControl = sceneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-
-			// 已经开始控制后，保持到松开右键
-			const bool enableCamera = 
-				windowFocused &&
-				sceneImageVisible &&
-				rightMouseDown &&
-				(inputState.cameraControlActive || startCameraControl);
-
-			if (enableCamera != inputState.cameraControlActive)
+			if (timerResolutionEnabled)
 			{
-				inputState.cameraControlActive = enableCamera;
-				inputState.firstMouse = true;
-
-				glfwSetInputMode(
-					window,
-					GLFW_CURSOR,
-					enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
-				);
+				timeEndPeriod(1); // 恢复系统定时器分辨率
 			}
 
-			// 鼠标位于场景画面上时，滚轮缩放选中的物体
-			if (windowFocused && sceneHovered&& selectedObjectIndex < scene.objects.size())
-			{
-				SceneObject& scrollObject = scene.objects[selectedObjectIndex];
+			ImGui_ImplOpenGL3_Shutdown();
+			ImGui_ImplGlfw_Shutdown();
+			ImGui::DestroyContext();
 
-				scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
-				scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
-			}
+			glfwSetCursorPosCallback(window, nullptr);
+			glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
+			glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
 
-			const float aspectRatio = static_cast<float>(sceneFramebuffer.GetWidth()) / static_cast<float>(sceneFramebuffer.GetHeight());
-			// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
-			//const glm::mat4 projection = glm::ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f);
-			
-			// OpenGL 右手系，默认朝向-z方向
-			// Unity 左手系
-			const glm::mat4 projection = glm::perspective(
-				glm::radians(45.0f), // 视野角度，单位为弧度
-				aspectRatio, 
-				0.1f, 
-				100.0f // 近平面和远平面距离
-			); // 透视投影矩阵
-
-			//const glm::mat4 view = glm::translate(
-			//	glm::mat4(1.0f),  // 初始化为单位矩阵
-			//	glm::vec3(0.0f, 0.0f, -3.0f) // 将相机向后移动3个单位，相当于003
-			//); // 视图矩阵，向后移动相机
-
-			const glm::mat4 view = camera.GetViewMatrix();
-
-			// 设置绘图区域
-			sceneFramebuffer.Bind();
-
-			// 用前面的颜色清除屏幕 包括深度缓存
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			shader.Bind();
-			shader.SetFloat("uAmbientStrength", ambientStrength);
-			shader.SetFloat("uSpecularStrength", 1.0f);
-			shader.SetFloat("uShininess", 128.0f);
-
-			shader.SetVec3("uToLightDirection", toLightDirection);
-			shader.SetVec3("uLightColor", lightColor);
-			shader.SetVec3("uCameraPosition", camera.GetPosition());
-
-			shader.SetMat4("uView", view);
-			shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
-
-			for (const SceneObject& object : scene.objects)
-			{
-				glm::mat4 transform(1.0f);
-
-				transform = glm::translate(transform, object.position);
-
-				transform = glm::rotate(transform, glm::radians(object.rotation.y),glm::vec3(0.0f, 1.0f, 0.0f));
-				//glm::radians(rotationAngle) 将角度转换为弧度，因为glm::rotate函数需要弧度值
-				// glm::vec3(0, 0, 1) 表示绕Z轴旋转，这里假设三角形在XY平面上
-				transform = glm::rotate(transform, glm::radians(object.rotation.x), glm::vec3(1, 0, 0));
-				transform = glm::rotate(transform,glm::radians(object.rotation.z),glm::vec3(0.0f, 0.0f, 1.0f));
-				transform = glm::scale(transform, object.scale);
-
-				shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
-				model->Draw(shader);
-			}
-
-			Framebuffer::Unbind();
-			//恢复窗口的视图大小
-			glViewport(0, 0, framebufferWidth, framebufferHeight);
-			// 清除窗口背景
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-			// IMGUI界面绘制顺序
-			ImGui::Render();
-
-			//绘制在3维场景上方
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-			// 把这一帧的渲染结果显示到屏幕上
-			glfwSwapBuffers(window);
-			// 渲染结束
-
-			// 累计统计数据
-			accumulatedTime += deltaTime;
-			++frameCount;
-
-			// 每0.5秒更新一次窗口标题，显示FPS
-			if (accumulatedTime >= 0.5)
-			{
-				const double fps = frameCount / accumulatedTime;
-				const double averageFrameMs = accumulatedTime / frameCount * 1000.0;
-
-				std::ostringstream title;
-				title << "StarGate | "
-					<< std::fixed << std::setprecision(1)
-					<< fps << " FPS | "
-					<< std::setprecision(2)
-					<< averageFrameMs << " ms";
-
-				glfwSetWindowTitle(window, title.str().c_str());
-
-				// 重置计数器
-				accumulatedTime = 0.0;
-				frameCount = 0;
-			}
-
-			// 计算本帧的工作时间
-			const double frameWorkTime = glfwGetTime() - frameStartTime;
-			const double remainingTime = targetFrameTime - frameWorkTime;
-
-			//工作完成较快的时候，等待剩余时间，尽量接近目标帧率
-			if (remainingTime > 0.0)
-			{
-				//chrono::duration 将double转换成表示时间的类型
-				std::this_thread::sleep_for(std::chrono::duration<double>(remainingTime));
-			}
-		}
-
-		if (timerResolutionEnabled)
-		{
-			timeEndPeriod(1); // 恢复系统定时器分辨率
-		}
-
-		ImGui_ImplOpenGL3_Shutdown();
-		ImGui_ImplGlfw_Shutdown();
-		ImGui::DestroyContext();
-
-		glfwSetCursorPosCallback(window, nullptr);
-		glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
-		glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
-
-		return 0;
-	}();
+			return 0;
+		}();
 	// Shader已经释放，现在销毁OpenGL Context
 	glfwDestroyWindow(window);
 	glfwTerminate();
