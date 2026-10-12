@@ -466,6 +466,44 @@ int main()
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
+			// 顶层菜单
+			if (ImGui::BeginMainMenuBar())
+			{
+				if (ImGui::BeginMenu("File"))
+				{
+					if (ImGui::MenuItem("Save Scene"))
+					{
+						const bool saved = SaveScene(
+							sceneFilePath,
+							scene.modelPath.c_str(),
+							scene.objects.data(),
+							scene.objects.size()
+						);
+
+						sceneSaveMessage = saved
+							? "Scene saved."
+							: "Save failed. Check console.";
+					}
+
+					if (ImGui::MenuItem("Load Scene"))
+					{
+						loadSceneRequested = true;
+						sceneSaveMessage = "Loading scene...";
+					}
+
+					ImGui::Separator();
+
+					if (ImGui::MenuItem("Exit"))
+					{
+						glfwSetWindowShouldClose(window, GLFW_TRUE);
+					}
+
+					ImGui::EndMenu();
+				}
+
+				ImGui::EndMainMenuBar();
+			}
+
 			// 在主窗口的工作区域创建停靠空间
 			ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
 
@@ -516,29 +554,6 @@ int main()
 				}
 
 				ImGui::Separator();
-
-				// 保存场景
-				if (ImGui::Button("Save Scene"))
-				{
-					const bool saved = SaveScene(
-						STARGATE_ASSET_DIR "/scenes/default.json",
-						scene.modelPath.c_str(),
-						scene.objects.data(),
-						scene.objects.size()
-					);
-
-					sceneSaveMessage = saved
-						? "Scene saved."
-						: "Save failed. Check console.";
-				}
-
-				ImGui::SameLine();
-
-				if (ImGui::Button("Load Scene"))
-				{
-					loadSceneRequested = true;
-					sceneSaveMessage = "Loading scene...";
-				}
 
 				if (!sceneSaveMessage.empty())
 				{
