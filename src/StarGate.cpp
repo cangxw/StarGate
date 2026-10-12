@@ -256,6 +256,9 @@ int main()
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 
+		// 开启面板停靠
+		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
 		//使用深色的界面
 		ImGui::StyleColorsDark();
 
@@ -375,39 +378,42 @@ int main()
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
 
-			const ImGuiIO& io = ImGui::GetIO();
-			//是否按住右键
-			const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-			// 开始控制的时候，鼠标必须在界面外面
-			// 一直保持到右键松开
-			const bool enableCamera = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE &&
-				rightMouseDown &&
-				// 当前是相机激活状态 或者 IMGUI不捕捉鼠标
-				(inputState.cameraControlActive || !io.WantCaptureMouse);
-			// 状态发生变化时切换光标模式
-			if (enableCamera != inputState.cameraControlActive)
-			{
-				inputState.cameraControlActive = enableCamera;
-				inputState.firstMouse = true;
+			// 在主窗口的工作区域创建停靠空间
+			ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
 
-				glfwSetInputMode(
-					window,
-					GLFW_CURSOR,
-					enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
-				);
-			}
+			const ImGuiIO& io = ImGui::GetIO();
+			////是否按住右键
+			//const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+			//// 开始控制的时候，鼠标必须在界面外面
+			//// 一直保持到右键松开
+			//const bool enableCamera = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE &&
+			//	rightMouseDown &&
+			//	// 当前是相机激活状态 或者 IMGUI不捕捉鼠标
+			//	(inputState.cameraControlActive || !io.WantCaptureMouse);
+			//// 状态发生变化时切换光标模式
+			//if (enableCamera != inputState.cameraControlActive)
+			//{
+			//	inputState.cameraControlActive = enableCamera;
+			//	inputState.firstMouse = true;
+
+			//	glfwSetInputMode(
+			//		window,
+			//		GLFW_CURSOR,
+			//		enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
+			//	);
+			//}
 
 			// 面板不需要鼠标输入的时候，滚轮用于缩放物体
-			if (!io.WantCaptureMouse)
-			{
-				SceneObject& scrollObject = cubeObjects[selectedObjectIndex];
-				scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
+			//if (!io.WantCaptureMouse)
+			//{
+			//	SceneObject& scrollObject = cubeObjects[selectedObjectIndex];
+			//	scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
 
-				scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
-			}
+			//	scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
+			//}
 
-			ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_Once);
-			ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_Once);
+			ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
+			ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
 			if (ImGui::Begin("Hierarchy"))
 			{
 				for (int i = 0; i < 3; ++i)
@@ -426,8 +432,8 @@ int main()
 			SceneObject& selectedObject = cubeObjects[selectedObjectIndex];
 			//此时只是生成界面，实际绘制放在后面。
 			//ImGui::ShowDemoWindow();
-			ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_Once);
-			ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale),ImGuiCond_Once);
+			ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
+			ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale), ImGuiCond_FirstUseEver);
 
 			if (ImGui::Begin("Inspector"))
 			{
@@ -457,7 +463,10 @@ int main()
 			ImGui::End();
 
 			// IMGUI的Scene视图
-			ImGui::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_Once);
+			bool sceneHovered = false;
+			bool sceneImageVisible = false;
+
+			ImGui::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_FirstUseEver);
 			if (ImGui::Begin("Scene", nullptr,
 				ImGuiWindowFlags_NoScrollbar |
 				ImGuiWindowFlags_NoScrollWithMouse))
@@ -478,9 +487,47 @@ int main()
 					);
 
 					ImGui::Image(sceneTexture, sceneSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+					sceneHovered = ImGui::IsItemHovered();
+					sceneImageVisible = true;	//如果 Scene 面板折叠了，或者内部没有足够的显示空间，这段代码不会执行，变量就保持 false。
 				}
 			}
 			ImGui::End();
+
+			// 鼠标的处理
+			const bool windowFocused = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
+			const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+
+			//在Scene场景里按下才算开始控制相机
+			const bool startCameraControl = sceneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
+
+			// 已经开始控制后，保持到松开右键
+			const bool enableCamera = 
+				windowFocused &&
+				sceneImageVisible &&
+				rightMouseDown &&
+				(inputState.cameraControlActive || startCameraControl);
+
+			if (enableCamera != inputState.cameraControlActive)
+			{
+				inputState.cameraControlActive = enableCamera;
+				inputState.firstMouse = true;
+
+				glfwSetInputMode(
+					window,
+					GLFW_CURSOR,
+					enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
+				);
+			}
+
+			// 鼠标位于场景画面上时，滚轮缩放选中的物体
+			if (windowFocused && sceneHovered)
+			{
+				SceneObject& scrollObject = cubeObjects[selectedObjectIndex];
+
+				scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
+				scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
+			}
 
 			const float aspectRatio = static_cast<float>(sceneFramebuffer.GetWidth()) / static_cast<float>(sceneFramebuffer.GetHeight());
 			// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
