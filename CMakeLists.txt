@@ -85,6 +85,8 @@ add_executable (StarGate
 	"src/MaterialData.h" 
 	"src/Model.h" 
 	"src/Model.cpp" 
+	"src/Framebuffer.h"
+	"src/Framebuffer.cpp"
 )
 
 # 资源文件目录，这样读取图片不依赖vs的目录

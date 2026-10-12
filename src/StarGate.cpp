@@ -27,6 +27,7 @@
 #include "Camera.h"
 #include "SceneObject.h"
 #include "Model.h"
+#include "Framebuffer.h"
 
 struct InputState
 {
@@ -137,7 +138,7 @@ int main()
 			return -1;
 		}
 
-		Model  model(STARGATE_ASSET_DIR "/models/material_test/cube.obj");
+		Model model(STARGATE_ASSET_DIR "/models/material_test/cube.obj");
 		if (!model.IsValid())
 		{
 			std::cerr << "Failed to create model"<< std::endl;
@@ -242,6 +243,14 @@ int main()
 
 		// 显示鼠标
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+
+		// 创建Framebuffer
+		Framebuffer sceneFramebuffer(800, 600);
+		if(!sceneFramebuffer.IsValid())
+		{ 
+			std::cerr << "Failed to create scene framebuffer\n";
+			return -1;
+		}
 
 		// 创建Imgui上下文
 		IMGUI_CHECKVERSION();
@@ -447,7 +456,33 @@ int main()
 			}
 			ImGui::End();
 
-			const float aspectRatio = static_cast<float>(framebufferWidth) / static_cast<float>(framebufferHeight);
+			// IMGUI的Scene视图
+			ImGui::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_Once);
+			if (ImGui::Begin("Scene", nullptr,
+				ImGuiWindowFlags_NoScrollbar |
+				ImGuiWindowFlags_NoScrollWithMouse))
+			{
+				// 面板中的剩余可用空间
+				const ImVec2 sceneSize = ImGui::GetContentRegionAvail();
+
+				// 将界面尺寸转换成实际图像的像素尺寸
+				const int sceneWidth = static_cast<int>(sceneSize.x * io.DisplayFramebufferScale.x);
+				const int sceneHeight = static_cast<int>(sceneSize.y * io.DisplayFramebufferScale.y);
+
+				if (sceneWidth > 0 && sceneHeight > 0)
+				{
+					sceneFramebuffer.Resize(sceneWidth, sceneHeight);
+
+					const ImTextureRef sceneTexture(
+						static_cast<ImTextureID>(sceneFramebuffer.GetColorTexture())
+					);
+
+					ImGui::Image(sceneTexture, sceneSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+				}
+			}
+			ImGui::End();
+
+			const float aspectRatio = static_cast<float>(sceneFramebuffer.GetWidth()) / static_cast<float>(sceneFramebuffer.GetHeight());
 			// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
 			//const glm::mat4 projection = glm::ortho(-aspectRatio, aspectRatio, -1.0f, 1.0f);
 			
@@ -468,7 +503,7 @@ int main()
 			const glm::mat4 view = camera.GetViewMatrix();
 
 			// 设置绘图区域
-			glViewport(0, 0, framebufferWidth, framebufferHeight);
+			sceneFramebuffer.Bind();
 
 			// 用前面的颜色清除屏幕 包括深度缓存
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -502,7 +537,13 @@ int main()
 				model.Draw(shader);
 			}
 
-			// 整理界面绘制顺序
+			Framebuffer::Unbind();
+			//恢复窗口的视图大小
+			glViewport(0, 0, framebufferWidth, framebufferHeight);
+			// 清除窗口背景
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			// IMGUI界面绘制顺序
 			ImGui::Render();
 
 			//绘制在3维场景上方
