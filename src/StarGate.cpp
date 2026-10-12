@@ -51,6 +51,13 @@ struct InputState
 	bool cameraControlActive = false;
 };
 
+// ImGui 接收 UTF-8 文本，这个函数负责转换路径编码。中文文件名的显示还需要字体包含对应中文字形。
+static std::string PathToUtf8(const std::filesystem::path& path)
+{
+	const std::u8string text = path.generic_u8string();
+	return std::string(text.begin(), text.end());
+}
+
 int main()
 {
 	//  GLFW的错误输出到控制台
@@ -319,6 +326,10 @@ int main()
 		std::string sceneSaveMessage;
 		bool loadSceneRequested = false;
 
+		// 资产目录
+		const std::filesystem::path assetRoot = STARGATE_ASSET_DIR;
+		std::filesystem::path currentAssetDirectory = assetRoot;
+
 		// 主循环
 		while (!glfwWindowShouldClose(window))
 		{
@@ -508,7 +519,7 @@ int main()
 			// 在主窗口的工作区域创建停靠空间
 			//ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
 			const ImGuiViewport* viewport = ImGui::GetMainViewport();
-			const ImGuiID dockspaceID = ImGui::GetID("StarGateDockSpace");
+			const ImGuiID dockspaceID = ImGui::GetID("StarGateDockSpaceV3");
 			if (ImGui::DockBuilderGetNode(dockspaceID) == nullptr)
 			{
 				ImGui::DockBuilderAddNode(
@@ -540,8 +551,20 @@ int main()
 					&centerID
 				);
 
+				ImGuiID hierarchyID = 0;
+				ImGuiID assetsID = 0;
+				// 将左侧区域上下各分一半
+				ImGui::DockBuilderSplitNode(
+					leftID,
+					ImGuiDir_Up,
+					0.5f,
+					&hierarchyID,
+					&assetsID
+				);
+
 				// 将面板放入对应区域，名称必须与 Begin() 中一致
-				ImGui::DockBuilderDockWindow("Hierarchy", leftID);
+				ImGui::DockBuilderDockWindow("Hierarchy", hierarchyID);
+				ImGui::DockBuilderDockWindow("Assets", assetsID);
 				ImGui::DockBuilderDockWindow("Inspector", rightID);
 				ImGui::DockBuilderDockWindow("Scene", centerID);
 
@@ -568,6 +591,74 @@ int main()
 					}
 
 					ImGui::PopID();
+				}
+			}
+			ImGui::End();
+
+			if (ImGui::Begin("Assets"))
+			{
+				// 根目录时禁止继续向上返回
+				ImGui::BeginDisabled(currentAssetDirectory == assetRoot);
+
+				if (ImGui::Button("Up"))
+				{
+					currentAssetDirectory = currentAssetDirectory.parent_path();
+				}
+
+				ImGui::EndDisabled();
+
+				const std::filesystem::path relativePath = currentAssetDirectory.lexically_relative(assetRoot);
+				const std::string directoryLabel = currentAssetDirectory == assetRoot
+					? "assets"
+					: "assets/" + PathToUtf8(relativePath);
+
+				ImGui::TextWrapped("%s", directoryLabel.c_str());
+				ImGui::Separator();
+
+				std::error_code error;
+				std::filesystem::directory_iterator iterator( currentAssetDirectory, error);
+				const std::filesystem::directory_iterator end;
+				for (; !error && iterator != end; iterator.increment(error))
+				{
+					const std::filesystem::directory_entry& entry = *iterator;
+					const bool isDirectory = entry.is_directory(error);
+
+					if (error)
+					{
+						break;
+					}
+
+					const std::string filename = PathToUtf8(entry.path().filename());
+					const std::string label =
+						isDirectory ? "[Dir] " + filename : filename;
+
+					const std::string itemID = PathToUtf8(entry.path());
+					ImGui::PushID(itemID.c_str());
+
+					const bool clicked = ImGui::Selectable(
+						label.c_str(),
+						false,
+						ImGuiSelectableFlags_AllowDoubleClick
+					);
+
+					const bool openDirectory =
+						clicked &&
+						isDirectory &&
+						ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+					ImGui::PopID();
+
+					if (openDirectory)
+					{
+						currentAssetDirectory = entry.path();
+						break;
+					}
+				}
+
+				if (error)
+				{
+					ImGui::TextWrapped("Cannot read directory: %s",
+						error.message().c_str());
 				}
 			}
 			ImGui::End();
