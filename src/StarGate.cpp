@@ -29,6 +29,7 @@
 #include <system_error>
 #include <memory>	//管理动态创建的对象 比如make_unique
 #include <utility>	// 提供移动等通用工具 std::move等
+#include <imgui_internal.h>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -505,11 +506,54 @@ int main()
 			}
 
 			// 在主窗口的工作区域创建停靠空间
-			ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
+			//ImGui::DockSpaceOverViewport();	//提供可以停靠的区域
+			const ImGuiViewport* viewport = ImGui::GetMainViewport();
+			const ImGuiID dockspaceID = ImGui::GetID("StarGateDockSpace");
+			if (ImGui::DockBuilderGetNode(dockspaceID) == nullptr)
+			{
+				ImGui::DockBuilderAddNode(
+					dockspaceID,
+					ImGuiDockNodeFlags_DockSpace
+				);
+
+				ImGui::DockBuilderSetNodeSize(dockspaceID, viewport->WorkSize);
+
+				ImGuiID centerID = dockspaceID;
+				ImGuiID leftID = 0;
+				ImGuiID rightID = 0;
+
+				// 从整个区域切出左侧 12%
+				ImGui::DockBuilderSplitNode(
+					centerID,
+					ImGuiDir_Left,
+					0.12f,
+					&leftID,
+					&centerID
+				);
+
+				// 从剩余区域切出右侧 23%，约占整个区域的 20%
+				ImGui::DockBuilderSplitNode(
+					centerID,
+					ImGuiDir_Right,
+					0.23f,
+					&rightID,
+					&centerID
+				);
+
+				// 将面板放入对应区域，名称必须与 Begin() 中一致
+				ImGui::DockBuilderDockWindow("Hierarchy", leftID);
+				ImGui::DockBuilderDockWindow("Inspector", rightID);
+				ImGui::DockBuilderDockWindow("Scene", centerID);
+
+				ImGui::DockBuilderFinish(dockspaceID);
+			}
+
+			// 每帧提交停靠区域
+			ImGui::DockSpaceOverViewport(dockspaceID, viewport);
 
 			const ImGuiIO& io = ImGui::GetIO();
-			ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
-			ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
+			//ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
+			//ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
 			if (ImGui::Begin("Hierarchy"))
 			{
 				for (std::size_t i = 0; i < scene.objects.size(); ++i)
@@ -532,8 +576,8 @@ int main()
 			SceneObject& selectedObject = scene.objects[selectedObjectIndex];
 			//此时只是生成界面，实际绘制放在后面。
 			//ImGui::ShowDemoWindow();
-			ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
-			ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale), ImGuiCond_FirstUseEver);
+			//ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
+			//ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale), ImGuiCond_FirstUseEver);
 
 			if (ImGui::Begin("Inspector"))
 			{
@@ -575,7 +619,7 @@ int main()
 			bool sceneHovered = false;
 			bool sceneImageVisible = false;
 
-			ImGui::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_FirstUseEver);
+			//::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_FirstUseEver);
 			if (ImGui::Begin("Scene", nullptr,
 				ImGuiWindowFlags_NoScrollbar |
 				ImGuiWindowFlags_NoScrollWithMouse))
