@@ -27,6 +27,8 @@
 #include <string>
 #include <filesystem>
 #include <system_error>
+#include <memory>	//管理动态创建的对象 比如make_unique
+#include <utility>	// 提供移动等通用工具 std::move等
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -193,9 +195,13 @@ int main()
 		// 根据场景里的模型路径加载模型
 		const std::string modelFullPath = std::string(STARGATE_ASSET_DIR) + "/" + scene.modelPath;
 
-		Model model(modelFullPath.c_str());
+		// 使用unique 为了在运行中加载场景时，能够替换当前模型，并自动释放旧模型
+		// 赋值转移的是指针的所有权，不需要复制或移动 Model 对象本身
+		//model 释放旧模型 → 接管新模型
+		// loadedModel     → 变为空指针
+		auto model = std::make_unique<Model>(modelFullPath.c_str());
 
-		if (!model.IsValid())
+		if (!model->IsValid())
 		{
 			std::cerr << "Failed to create model"<< std::endl;
 			return -1;
@@ -310,12 +316,57 @@ int main()
 		ImGui_ImplOpenGL3_Init("#version 330 core");
 
 		std::string sceneSaveMessage;
+		bool loadSceneRequested = false;
 
 		// 主循环
 		while (!glfwWindowShouldClose(window))
 		{
 			// 记录本次循环的开始时间
 			const double frameStartTime = glfwGetTime();
+
+			if (loadSceneRequested)
+			{
+				loadSceneRequested = false;
+
+				SceneData loadedScene;
+
+				if (!LoadScene(sceneFilePath, loadedScene))
+				{
+					sceneSaveMessage = "Load failed. Check console.";
+				}
+				else
+				{
+					const std::string loadedModelPath =
+						std::string(STARGATE_ASSET_DIR) + "/" +
+						loadedScene.modelPath;
+
+					auto loadedModel =
+						std::make_unique<Model>(loadedModelPath.c_str());
+
+					if (!loadedModel->IsValid())
+					{
+						sceneSaveMessage = "Model load failed. Check console.";
+					}
+					else
+					{
+						// 场景数据和模型都准备好后，再替换当前状态
+						scene = std::move(loadedScene);
+						//会完成三件事：
+						//	1. 删除 model 原来拥有的旧 Model 对象，调用它的析构函数。
+						//	2. model 接管 loadedModel 拥有的新对象。
+						//	3. loadedModel 变为空指针。
+						model = std::move(loadedModel);
+
+						selectedObjectIndex = 0;
+
+						sceneSaveMessage = "Scene loaded.";
+					}
+				}
+
+				// 加载可能耗时，避免后面的移动使用过大的时间间隔
+				lastTime = glfwGetTime();
+			}
+
 			glfwPollEvents(); // 立即处理所有挂起的事件
 
 			// 计算本次循环与上次循环的时间差
@@ -423,14 +474,18 @@ int main()
 			ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
 			if (ImGui::Begin("Hierarchy"))
 			{
-				for (int i = 0; i < 3; ++i)
+				for (std::size_t i = 0; i < scene.objects.size(); ++i)
 				{
+					ImGui::PushID(static_cast<int>(i)); //后面的控件生成 ID 时包含,它需要成对使用，否则这个索引会继续影响后面的控件。
+
 					const bool selected = (i == selectedObjectIndex);
 
 					if (ImGui::Selectable(scene.objects[i].name.c_str(), selected))
 					{
 						selectedObjectIndex = i;
 					}
+
+					ImGui::PopID();
 				}
 			}
 			ImGui::End();
@@ -475,6 +530,14 @@ int main()
 					sceneSaveMessage = saved
 						? "Scene saved."
 						: "Save failed. Check console.";
+				}
+
+				ImGui::SameLine();
+
+				if (ImGui::Button("Load Scene"))
+				{
+					loadSceneRequested = true;
+					sceneSaveMessage = "Loading scene...";
 				}
 
 				if (!sceneSaveMessage.empty())
@@ -612,7 +675,7 @@ int main()
 				transform = glm::scale(transform, object.scale);
 
 				shader.SetMat4("uTransform", transform); // 将偏移量传递给着色器
-				model.Draw(shader);
+				model->Draw(shader);
 			}
 
 			Framebuffer::Unbind();
