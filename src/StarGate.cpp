@@ -30,6 +30,7 @@
 #include <memory>	//管理动态创建的对象 比如make_unique
 #include <utility>	// 提供移动等通用工具 std::move等
 #include <imgui_internal.h>
+#include <cstddef>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -397,27 +398,31 @@ int main()
 
 			if (!ImGui::GetIO().WantCaptureKeyboard)
 			{
-				SceneObject& ketboardObject = scene.objects[selectedObjectIndex];
+				if (selectedObjectIndex < scene.objects.size())
+				{
+					SceneObject& ketboardObject = scene.objects[selectedObjectIndex];
 
-				if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-				{
-					ketboardObject.position.x -= moveDistance;
+					if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
+					{
+						ketboardObject.position.x -= moveDistance;
+					}
+
+					if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
+					{
+						ketboardObject.position.x += moveDistance;
+					}
+
+					const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
+					if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+					{
+						ketboardObject.rotation.y += rotationStep; // 逆时针旋转
+					}
+					if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+					{
+						ketboardObject.rotation.y -= rotationStep; // 顺时针旋转
+					}
 				}
 
-				if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-				{
-					ketboardObject.position.x += moveDistance;
-				}
-
-				const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
-				if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-				{
-					ketboardObject.rotation.y += rotationStep; // 逆时针旋转
-				}
-				if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-				{
-					ketboardObject.rotation.y -= rotationStep; // 顺时针旋转
-				}
 
 				// 切换灯光颜色
 				if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
@@ -477,6 +482,29 @@ int main()
 			ImGui_ImplOpenGL3_NewFrame();
 			ImGui_ImplGlfw_NewFrame();
 			ImGui::NewFrame();
+
+			if (!ImGui::GetIO().WantCaptureKeyboard &&
+				ImGui::IsKeyPressed(ImGuiKey_Delete, false) &&
+				selectedObjectIndex < scene.objects.size())
+			{
+				scene.objects.erase(
+					scene.objects.begin() +
+					static_cast<std::ptrdiff_t>(selectedObjectIndex)
+				);
+
+				// 删除最后一个物体后，暂时将索引保持为 0；
+				// 后续必须检查是否存在选中物体
+				if (scene.objects.empty())
+				{
+					selectedObjectIndex = 0;
+				}
+				else if (selectedObjectIndex >= scene.objects.size())
+				{
+					selectedObjectIndex = scene.objects.size() - 1;
+				}
+
+				sceneSaveMessage = "Object deleted. Save Scene to keep changes.";
+			}
 
 			// 顶层菜单
 			if (ImGui::BeginMainMenuBar())
@@ -664,7 +692,6 @@ int main()
 			ImGui::End();
 
 			// 在列表处理之后取得选中物体
-			SceneObject& selectedObject = scene.objects[selectedObjectIndex];
 			//此时只是生成界面，实际绘制放在后面。
 			//ImGui::ShowDemoWindow();
 			//ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
@@ -672,20 +699,29 @@ int main()
 
 			if (ImGui::Begin("Inspector"))
 			{
-				ImGui::Text(
-					"Selected: %s",
-					scene.objects[selectedObjectIndex].name.c_str()
-				);
-
-				ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
-				ImGui::DragFloat3("Rotation", glm::value_ptr(selectedObject.rotation), 0.5f);
-				ImGui::DragFloat3("Scale", glm::value_ptr(selectedObject.scale), 0.01f, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-
-				if (ImGui::Button("Reset Transform"))
+				if (selectedObjectIndex < scene.objects.size())
 				{
-					selectedObject.position = glm::vec3(0.0f);
-					selectedObject.rotation = glm::vec3(0.0f);
-					selectedObject.scale = glm::vec3(1.0f);
+					SceneObject& selectedObject = scene.objects[selectedObjectIndex];
+
+					ImGui::Text(
+						"Selected: %s",
+						selectedObject.name.c_str()
+					);
+
+					ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
+					ImGui::DragFloat3("Rotation", glm::value_ptr(selectedObject.rotation), 0.5f);
+					ImGui::DragFloat3("Scale", glm::value_ptr(selectedObject.scale), 0.01f, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+
+					if (ImGui::Button("Reset Transform"))
+					{
+						selectedObject.position = glm::vec3(0.0f);
+						selectedObject.rotation = glm::vec3(0.0f);
+						selectedObject.scale = glm::vec3(1.0f);
+					}
+				}
+				else
+				{
+					ImGui::TextUnformatted("No object selected.");
 				}
 
 				ImGui::Separator();
@@ -765,7 +801,7 @@ int main()
 			}
 
 			// 鼠标位于场景画面上时，滚轮缩放选中的物体
-			if (windowFocused && sceneHovered)
+			if (windowFocused && sceneHovered&& selectedObjectIndex < scene.objects.size())
 			{
 				SceneObject& scrollObject = scene.objects[selectedObjectIndex];
 

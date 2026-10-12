@@ -61,7 +61,7 @@ namespace
 
 bool SaveScene(const char* filePath,const char* modelPath,const SceneObject* objects,std::size_t objectCount)
 {
-    if (!filePath || !modelPath || !objects || objectCount == 0)
+    if (!filePath || !modelPath || (objectCount > 0 && !objects))
     {
         std::cerr << "Invalid scene data\n";
         return false;
@@ -174,8 +174,7 @@ bool LoadScene(const char* filePath, SceneData& scene)
         !root["version"].is_number() ||
         root["version"].number_value() != 1.0 ||
         !root["modelPath"].is_string() ||
-        !root["objects"].is_array() ||
-        root["objects"].array_items().empty())
+        !root["objects"].is_array())
     {
         std::cerr << "Invalid scene format\n";
         return false;
