@@ -1,6 +1,45 @@
 #include "EditorUI.h"
 #include <imgui.h>
 #include <glm/gtc/type_ptr.hpp>	//glm::value_ptr 用来取得 GLM 向量或矩阵内部数据的指针，方便传给其他函数
+#include <imgui_internal.h>
+
+void EditorUI::DrawDockSpace()
+{
+	const ImGuiViewport* viewport = ImGui::GetMainViewport();
+	const ImGuiID dockspaceID = ImGui::GetID("StarGateDockSpaceV3");
+
+	if (ImGui::DockBuilderGetNode(dockspaceID) == nullptr)
+	{
+		ImGuiID centerID = dockspaceID;
+		ImGuiID leftID = 0;
+		ImGuiID rightID = 0;
+		ImGuiID hierarchyID = 0;
+		ImGuiID assetsID = 0;
+
+		ImGui::DockBuilderAddNode(dockspaceID, ImGuiDockNodeFlags_DockSpace);
+		ImGui::DockBuilderSetNodeSize(dockspaceID, viewport->WorkSize);
+
+		// 从整个区域切出左侧 12%
+		ImGui::DockBuilderSplitNode(centerID, ImGuiDir_Left, 0.12f, &leftID, &centerID);
+
+		// 从剩余区域切出右侧 23%，约占整个区域的 20%
+		ImGui::DockBuilderSplitNode(centerID, ImGuiDir_Right, 0.23f, &rightID, &centerID);
+
+		// 将左侧区域上下各分一半
+		ImGui::DockBuilderSplitNode(leftID, ImGuiDir_Up, 0.5f, &hierarchyID, &assetsID);
+
+		// 将面板放入对应区域，名称必须与 Begin() 中一致
+		ImGui::DockBuilderDockWindow("Hierarchy", hierarchyID);
+		ImGui::DockBuilderDockWindow("Assets", assetsID);
+		ImGui::DockBuilderDockWindow("Inspector", rightID);
+		ImGui::DockBuilderDockWindow("Scene", centerID);
+
+		ImGui::DockBuilderFinish(dockspaceID);
+	}
+
+	// 每帧提交停靠区域
+	ImGui::DockSpaceOverViewport(dockspaceID, viewport);
+}
 
 void EditorUI::DrawHierarchy(const SceneData& scene, std::size_t& selectedObjectIndex)
 {
