@@ -4,6 +4,7 @@
 #include <imgui_internal.h>
 #include <filesystem>
 #include "Engine/PathUtils.h"
+#include "Framebuffer.h"
 
 static bool IsModelFile(const std::filesystem::path& path)
 {
@@ -250,4 +251,39 @@ void EditorUI::DrawInspector(SceneData& scene, std::size_t& selectedObjectIndex,
 	}
 
 	ImGui::End();
+}
+
+SceneViewState EditorUI::DrawScene(Framebuffer& sceneFramebuffer)
+{
+	SceneViewState state;
+
+	if (ImGui::Begin("Scene", nullptr,
+		ImGuiWindowFlags_NoScrollbar |
+		ImGuiWindowFlags_NoScrollWithMouse))
+	{
+		const ImGuiIO& io = ImGui::GetIO();
+		// 面板中的剩余可用空间
+		const ImVec2 sceneSize = ImGui::GetContentRegionAvail();
+
+		// 将界面尺寸转换成实际图像的像素尺寸
+		const int sceneWidth = static_cast<int>(sceneSize.x * io.DisplayFramebufferScale.x);
+		const int sceneHeight = static_cast<int>(sceneSize.y * io.DisplayFramebufferScale.y);
+
+		if (sceneWidth > 0 && sceneHeight > 0)
+		{
+			sceneFramebuffer.Resize(sceneWidth, sceneHeight);
+
+			const ImTextureRef sceneTexture(
+				static_cast<ImTextureID>(sceneFramebuffer.GetColorTexture())
+			);
+
+			ImGui::Image(sceneTexture, sceneSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
+
+			state.hovered = ImGui::IsItemHovered();
+			state.imageVisible = true;	//如果 Scene 面板折叠了，或者内部没有足够的显示空间，这段代码不会执行，变量就保持 false。
+		}
+	}
+	ImGui::End();
+
+	return state;
 }

@@ -627,38 +627,10 @@ int main()
 				editorUI.DrawHierarchy(scene, selectedObjectIndex);
 				editorUI.DrawAssets(assetRoot, currentAssetDirectory, pendingModelPath, sceneSaveMessage);
 				editorUI.DrawInspector(scene, selectedObjectIndex, lightColor, ambientStrength, sceneSaveMessage);
+				const SceneViewState sceneView = editorUI.DrawScene(sceneFramebuffer);
 
-				// IMGUI的Scene视图
-				bool sceneHovered = false;
-				bool sceneImageVisible = false;
-
-				//::SetNextWindowSize(ImVec2(800.0f, 600.0f ), ImGuiCond_FirstUseEver);
-				if (ImGui::Begin("Scene", nullptr,
-					ImGuiWindowFlags_NoScrollbar |
-					ImGuiWindowFlags_NoScrollWithMouse))
-				{
-					// 面板中的剩余可用空间
-					const ImVec2 sceneSize = ImGui::GetContentRegionAvail();
-
-					// 将界面尺寸转换成实际图像的像素尺寸
-					const int sceneWidth = static_cast<int>(sceneSize.x * io.DisplayFramebufferScale.x);
-					const int sceneHeight = static_cast<int>(sceneSize.y * io.DisplayFramebufferScale.y);
-
-					if (sceneWidth > 0 && sceneHeight > 0)
-					{
-						sceneFramebuffer.Resize(sceneWidth, sceneHeight);
-
-						const ImTextureRef sceneTexture(
-							static_cast<ImTextureID>(sceneFramebuffer.GetColorTexture())
-						);
-
-						ImGui::Image(sceneTexture, sceneSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
-
-						sceneHovered = ImGui::IsItemHovered();
-						sceneImageVisible = true;	//如果 Scene 面板折叠了，或者内部没有足够的显示空间，这段代码不会执行，变量就保持 false。
-					}
-				}
-				ImGui::End();
+				const bool sceneHovered = sceneView.hovered;
+				const bool sceneImageVisible = sceneView.imageVisible;
 
 				// 鼠标的处理
 				const bool windowFocused = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
@@ -679,9 +651,7 @@ int main()
 					inputState.cameraControlActive = enableCamera;
 					inputState.firstMouse = true;
 
-					glfwSetInputMode(
-						window,
-						GLFW_CURSOR,
+					glfwSetInputMode( window, GLFW_CURSOR,
 						enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
 					);
 				}
