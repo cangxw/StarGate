@@ -2,6 +2,30 @@
 #include <imgui.h>
 #include <glm/gtc/type_ptr.hpp>	//glm::value_ptr 用来取得 GLM 向量或矩阵内部数据的指针，方便传给其他函数
 #include <imgui_internal.h>
+#include <filesystem>
+#include "Engine/PathUtils.h"
+
+static bool IsModelFile(const std::filesystem::path& path)
+{
+	std::string extension = PathToUtf8(path.extension());
+
+	// 把 extension 中的字符转成小写，并写回原字符串。
+	// transform 遍历一段数据，对每个元素执行指定操作，把结果保存到指定位置。
+	std::transform(
+		extension.begin(),		// 从字符串开头开始
+		extension.end(),			// 到字符串末尾结束，不包含 end 本身
+		extension.begin(),		// 结果从原字符串开头写入
+		[](unsigned char character)
+		{
+			return static_cast<char>(std::tolower(character));
+		}
+	);
+
+	return extension == ".fbx" ||
+		extension == ".obj" ||
+		extension == ".gltf" ||
+		extension == ".glb";
+}
 
 void EditorUI::DrawDockSpace()
 {
@@ -41,6 +65,40 @@ void EditorUI::DrawDockSpace()
 	ImGui::DockSpaceOverViewport(dockspaceID, viewport);
 }
 
+EditorMenuActions EditorUI::DrawMenuBar()
+{
+	EditorMenuActions actions;
+
+	// 顶层菜单
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("Save Scene"))
+			{
+				actions.saveScene = true;
+			}
+
+			if (ImGui::MenuItem("Load Scene"))
+			{
+				actions.loadScene = true;
+			}
+
+			ImGui::Separator();
+
+			if (ImGui::MenuItem("Exit"))
+			{
+				actions.exit = true;
+			}
+
+			ImGui::EndMenu();
+		}
+		ImGui::EndMainMenuBar();
+	}
+
+	return actions;
+}
+
 void EditorUI::DrawHierarchy(const SceneData& scene, std::size_t& selectedObjectIndex)
 {
 	if (ImGui::Begin("Hierarchy"))
@@ -48,7 +106,7 @@ void EditorUI::DrawHierarchy(const SceneData& scene, std::size_t& selectedObject
 		for (std::size_t i = 0; i < scene.objects.size(); ++i)
 		{
 			//后面的控件生成 ID 时包含,它需要成对使用，否则这个索引会继续影响后面的控件。
-			ImGui::PushID(static_cast<int>(i)); 
+			ImGui::PushID(static_cast<int>(i));
 
 			const bool selected = (i == selectedObjectIndex);
 
@@ -64,6 +122,90 @@ void EditorUI::DrawHierarchy(const SceneData& scene, std::size_t& selectedObject
 	ImGui::End();
 }
 
+void EditorUI::DrawAssets(const std::filesystem::path& assetRoot, std::filesystem::path& currentAssetDirectory,
+	std::string& pendingModelPath, std::string& sceneSaveMessage)
+{
+	if (ImGui::Begin("Assets"))
+	{
+		// 根目录时禁止继续向上返回
+		ImGui::BeginDisabled(currentAssetDirectory == assetRoot);
+
+		if (ImGui::Button("Up"))
+		{
+			currentAssetDirectory = currentAssetDirectory.parent_path();
+		}
+
+		ImGui::EndDisabled();
+
+		const std::filesystem::path relativePath = currentAssetDirectory.lexically_relative(assetRoot);
+		const std::string directoryLabel = currentAssetDirectory == assetRoot
+			? "assets"
+			: "assets/" + PathToUtf8(relativePath);
+
+		ImGui::TextWrapped("%s", directoryLabel.c_str());
+		ImGui::Separator();
+
+		std::error_code error;
+		std::filesystem::directory_iterator iterator(currentAssetDirectory, error);
+		const std::filesystem::directory_iterator end;
+		for (; !error && iterator != end; iterator.increment(error))
+		{
+			const std::filesystem::directory_entry& entry = *iterator;
+			const bool isDirectory = entry.is_directory(error);
+
+			if (error)
+			{
+				break;
+			}
+
+			const std::string filename = PathToUtf8(entry.path().filename());
+			const std::string label =
+				isDirectory ? "[Dir] " + filename : filename;
+
+			const std::string itemID = PathToUtf8(entry.path());
+			ImGui::PushID(itemID.c_str());
+
+			const bool clicked = ImGui::Selectable(
+				label.c_str(),
+				false,
+				ImGuiSelectableFlags_AllowDoubleClick
+			);
+
+			const bool doubleClicked =
+				clicked &&
+				ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+
+			ImGui::PopID();
+
+			if (doubleClicked)
+			{
+				if (isDirectory)
+				{
+					currentAssetDirectory = entry.path();
+					break;
+				}
+
+				if (IsModelFile(entry.path()))
+				{
+					pendingModelPath = PathToUtf8(
+						entry.path().lexically_relative(assetRoot)
+					);
+
+					sceneSaveMessage = "Loading model...";
+					break;
+				}
+			}
+		}
+
+		if (error)
+		{
+			ImGui::TextWrapped("Cannot read directory: %s",
+				error.message().c_str());
+		}
+	}
+	ImGui::End();
+}
+
 void EditorUI::DrawInspector(SceneData& scene, std::size_t& selectedObjectIndex, glm::vec3& lightColor,
 	float& ambientStrength, const std::string& statusMessage)
 {
@@ -72,7 +214,7 @@ void EditorUI::DrawInspector(SceneData& scene, std::size_t& selectedObjectIndex,
 		if (selectedObjectIndex < scene.objects.size())
 		{
 			SceneObject& selectedObject = scene.objects[selectedObjectIndex];
-			ImGui::Text( "Selected: %s", selectedObject.name.c_str());
+			ImGui::Text("Selected: %s", selectedObject.name.c_str());
 
 			ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
 			ImGui::DragFloat3("Rotation", glm::value_ptr(selectedObject.rotation), 0.5f);

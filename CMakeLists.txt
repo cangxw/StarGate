@@ -101,6 +101,7 @@ add_executable (StarGate
 	"src/SceneData.h"
 	"src/Editor/EditorUI.h"
 	"src/Editor/EditorUI.cpp"
+	"src/Engine/PathUtils.h"
 )
 
 # 资源文件目录，这样读取图片不依赖vs的目录

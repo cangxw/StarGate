@@ -30,8 +30,6 @@
 #include <memory>	//管理动态创建的对象 比如make_unique
 #include <utility>	// 提供移动等通用工具 std::move等
 #include <unordered_map>
-#include <algorithm>
-#include <cctype>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Shader.h"
@@ -42,6 +40,7 @@
 #include "SceneData.h"
 #include "SceneSerializer.h"
 #include "Editor/EditorUI.h"
+#include "Engine/PathUtils.h"
 
 
 struct InputState
@@ -53,13 +52,6 @@ struct InputState
 	bool firstMouse = true;
 	bool cameraControlActive = false;
 };
-
-// ImGui 接收 UTF-8 文本，这个函数负责转换路径编码。中文文件名的显示还需要字体包含对应中文字形。
-static std::string PathToUtf8(const std::filesystem::path& path)
-{
-	const std::u8string text = path.generic_u8string();
-	return std::string(text.begin(), text.end());
-}
 
 // 模型路径 → 已加载的模型资源
 using ModelCache = std::unordered_map<std::string, std::unique_ptr<Model>>;
@@ -113,26 +105,6 @@ static bool LoadSceneModels(const SceneData& scene, ModelCache& models)
 
 	models = std::move(loadedModels);
 	return true;
-}
-
-static bool IsModelFile(const std::filesystem::path& path)
-{
-	std::string extension = PathToUtf8(path.extension());
-
-	std::transform(
-		extension.begin(),
-		extension.end(),
-		extension.begin(),
-		[](unsigned char character)
-		{
-			return static_cast<char>(std::tolower(character));
-		}
-	);
-
-	return extension == ".fbx" ||
-		extension == ".obj" ||
-		extension == ".gltf" ||
-		extension == ".glb";
 }
 
 int main()
@@ -625,129 +597,35 @@ int main()
 					sceneSaveMessage = "Object deleted. Save Scene to keep changes.";
 				}
 
-				// 顶层菜单
-				if (ImGui::BeginMainMenuBar())
+				const EditorMenuActions menuActions = editorUI.DrawMenuBar();
+				if (menuActions.saveScene)
 				{
-					if (ImGui::BeginMenu("File"))
-					{
-						if (ImGui::MenuItem("Save Scene"))
-						{
-							const bool saved = SaveScene(
-								sceneFilePath,
-								scene.modelPath.c_str(),
-								scene.objects.data(),
-								scene.objects.size()
-							);
+					const bool saved = SaveScene(
+						sceneFilePath,
+						scene.modelPath.c_str(),
+						scene.objects.data(),
+						scene.objects.size()
+					);
 
-							sceneSaveMessage = saved
-								? "Scene saved."
-								: "Save failed. Check console.";
-						}
+					sceneSaveMessage = saved ? "Scene saved." : "Save failed. Check console.";
+				}
 
-						if (ImGui::MenuItem("Load Scene"))
-						{
-							loadSceneRequested = true;
-							sceneSaveMessage = "Loading scene...";
-						}
+				if (menuActions.loadScene)
+				{
+					loadSceneRequested = true;
+					sceneSaveMessage = "Loading scene...";
+				}
 
-						ImGui::Separator();
-
-						if (ImGui::MenuItem("Exit"))
-						{
-							glfwSetWindowShouldClose(window, GLFW_TRUE);
-						}
-
-						ImGui::EndMenu();
-					}
-
-					ImGui::EndMainMenuBar();
+				if (menuActions.exit)
+				{
+					glfwSetWindowShouldClose(window, GLFW_TRUE);
 				}
 
 				const ImGuiIO& io = ImGui::GetIO();
 				// 在主窗口的工作区域创建停靠空间
 				editorUI.DrawDockSpace();
 				editorUI.DrawHierarchy(scene, selectedObjectIndex);
-
-				if (ImGui::Begin("Assets"))
-				{
-					// 根目录时禁止继续向上返回
-					ImGui::BeginDisabled(currentAssetDirectory == assetRoot);
-
-					if (ImGui::Button("Up"))
-					{
-						currentAssetDirectory = currentAssetDirectory.parent_path();
-					}
-
-					ImGui::EndDisabled();
-
-					const std::filesystem::path relativePath = currentAssetDirectory.lexically_relative(assetRoot);
-					const std::string directoryLabel = currentAssetDirectory == assetRoot
-						? "assets"
-						: "assets/" + PathToUtf8(relativePath);
-
-					ImGui::TextWrapped("%s", directoryLabel.c_str());
-					ImGui::Separator();
-
-					std::error_code error;
-					std::filesystem::directory_iterator iterator(currentAssetDirectory, error);
-					const std::filesystem::directory_iterator end;
-					for (; !error && iterator != end; iterator.increment(error))
-					{
-						const std::filesystem::directory_entry& entry = *iterator;
-						const bool isDirectory = entry.is_directory(error);
-
-						if (error)
-						{
-							break;
-						}
-
-						const std::string filename = PathToUtf8(entry.path().filename());
-						const std::string label =
-							isDirectory ? "[Dir] " + filename : filename;
-
-						const std::string itemID = PathToUtf8(entry.path());
-						ImGui::PushID(itemID.c_str());
-
-						const bool clicked = ImGui::Selectable(
-							label.c_str(),
-							false,
-							ImGuiSelectableFlags_AllowDoubleClick
-						);
-
-						const bool doubleClicked =
-							clicked &&
-							ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
-
-						ImGui::PopID();
-
-						if (doubleClicked)
-						{
-							if (isDirectory)
-							{
-								currentAssetDirectory = entry.path();
-								break;
-							}
-
-							if (IsModelFile(entry.path()))
-							{
-								pendingModelPath = PathToUtf8(
-									entry.path().lexically_relative(assetRoot)
-								);
-
-								sceneSaveMessage = "Loading model...";
-								break;
-							}
-						}
-					}
-
-					if (error)
-					{
-						ImGui::TextWrapped("Cannot read directory: %s",
-							error.message().c_str());
-					}
-				}
-				ImGui::End();
-
+				editorUI.DrawAssets(assetRoot, currentAssetDirectory, pendingModelPath, sceneSaveMessage);
 				editorUI.DrawInspector(scene, selectedObjectIndex, lightColor, ambientStrength, sceneSaveMessage);
 
 				// IMGUI的Scene视图
