@@ -18,9 +18,6 @@
 #include <limits>
 
 #include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-#include <glm/gtc/type_ptr.hpp>	//这个头文件提供 glm::value_ptr()，用来取得 GLM 向量或矩阵内部数据的指针
 
 #include <json11.hpp>
 #include <iterator> // std::size
@@ -359,26 +356,7 @@ int main()
 			}
 
 			// 创建Imgui上下文
-			IMGUI_CHECKVERSION();
-			ImGui::CreateContext();
-
-			// 开启面板停靠
-			ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-			//使用深色的界面
-			ImGui::StyleColorsDark();
-
-			//DPI的适配
-			// 获取窗体所在屏幕的显示缩放比例
-			const float uiScale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
-
-			ImGuiStyle& style = ImGui::GetStyle();
-			style.ScaleAllSizes(uiScale);	// 空间间距，边距等尺寸
-			style.FontScaleDpi = uiScale;	// 字体大小
-
-			//连接GLFW和OPENGL后端
-			ImGui_ImplGlfw_InitForOpenGL(window, true);
-			ImGui_ImplOpenGL3_Init("#version 330 core");
+			editorUI.Initialize(window);
 
 			std::string sceneSaveMessage;
 			bool loadSceneRequested = false;
@@ -570,9 +548,7 @@ int main()
 				}
 
 				// 开始新的一帧
-				ImGui_ImplOpenGL3_NewFrame();
-				ImGui_ImplGlfw_NewFrame();
-				ImGui::NewFrame();
+				editorUI.BeginFrame();
 
 				if (!ImGui::GetIO().WantCaptureKeyboard &&
 					ImGui::IsKeyPressed(ImGuiKey_Delete, false) &&
@@ -727,11 +703,7 @@ int main()
 				// 清除窗口背景
 				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-				// IMGUI界面绘制顺序
-				ImGui::Render();
-
-				//绘制在3维场景上方
-				ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+				editorUI.Render();
 
 				// 把这一帧的渲染结果显示到屏幕上
 				glfwSwapBuffers(window);
@@ -778,9 +750,7 @@ int main()
 				timeEndPeriod(1); // 恢复系统定时器分辨率
 			}
 
-			ImGui_ImplOpenGL3_Shutdown();
-			ImGui_ImplGlfw_Shutdown();
-			ImGui::DestroyContext();
+			editorUI.Shutdown();
 
 			glfwSetCursorPosCallback(window, nullptr);
 			glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针

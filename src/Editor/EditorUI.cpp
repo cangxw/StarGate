@@ -1,8 +1,11 @@
-#include "EditorUI.h"
 #include <imgui.h>
 #include <glm/gtc/type_ptr.hpp>	//glm::value_ptr 用来取得 GLM 向量或矩阵内部数据的指针，方便传给其他函数
 #include <imgui_internal.h>
 #include <filesystem>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
+#include "EditorUI.h"
 #include "Engine/PathUtils.h"
 #include "Framebuffer.h"
 
@@ -26,6 +29,55 @@ static bool IsModelFile(const std::filesystem::path& path)
 		extension == ".obj" ||
 		extension == ".gltf" ||
 		extension == ".glb";
+}
+
+void EditorUI::Initialize(GLFWwindow* window)
+{
+	// 创建Imgui上下文
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+
+	// 开启面板停靠
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+	//使用深色的界面
+	ImGui::StyleColorsDark();
+
+	//DPI的适配
+	// 获取窗体所在屏幕的显示缩放比例
+	const float uiScale = ImGui_ImplGlfw_GetContentScaleForWindow(window);
+
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.ScaleAllSizes(uiScale);	// 空间间距，边距等尺寸
+	style.FontScaleDpi = uiScale;	// 字体大小
+
+	//连接GLFW和OPENGL后端
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init("#version 330 core");
+}
+
+void EditorUI::BeginFrame()
+{
+	// 开始新的一帧
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+}
+
+void EditorUI::Render()
+{
+	// IMGUI界面绘制顺序
+	ImGui::Render();
+
+	//绘制在3维场景上方
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+void EditorUI::Shutdown()
+{
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 }
 
 void EditorUI::DrawDockSpace()
