@@ -43,6 +43,7 @@
 #include "Framebuffer.h"
 #include "SceneData.h"
 #include "SceneSerializer.h"
+#include "Editor/EditorUI.h"
 
 
 struct InputState
@@ -374,6 +375,7 @@ int main()
 			);
 
 			std::size_t selectedObjectIndex = 0;
+			EditorUI editorUI;
 
 			// 显示鼠标
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -722,25 +724,8 @@ int main()
 				ImGui::DockSpaceOverViewport(dockspaceID, viewport);
 
 				const ImGuiIO& io = ImGui::GetIO();
-				//ImGui::SetNextWindowPos(ImVec2(20.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
-				//ImGui::SetNextWindowSize(ImVec2(220.0f * uiScale, 260.0f * uiScale), ImGuiCond_FirstUseEver);
-				if (ImGui::Begin("Hierarchy"))
-				{
-					for (std::size_t i = 0; i < scene.objects.size(); ++i)
-					{
-						ImGui::PushID(static_cast<int>(i)); //后面的控件生成 ID 时包含,它需要成对使用，否则这个索引会继续影响后面的控件。
-
-						const bool selected = (i == selectedObjectIndex);
-
-						if (ImGui::Selectable(scene.objects[i].name.c_str(), selected))
-						{
-							selectedObjectIndex = i;
-						}
-
-						ImGui::PopID();
-					}
-				}
-				ImGui::End();
+				
+				editorUI.DrawHierarchy(scene, selectedObjectIndex);
 
 				if (ImGui::Begin("Assets"))
 				{

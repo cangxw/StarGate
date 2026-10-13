@@ -99,6 +99,8 @@ add_executable (StarGate
 	"src/SceneSerializer.h"
 	"src/SceneSerializer.cpp"
 	"src/SceneData.h"
+	"src/Editor/EditorUI.h"
+	"src/Editor/EditorUI.cpp"
 )
 
 # 资源文件目录，这样读取图片不依赖vs的目录
@@ -108,6 +110,7 @@ target_compile_definitions(StarGate PRIVATE
 
 # 再给这个目标设置头文件搜索目录
 target_include_directories(StarGate PRIVATE 
+	"${CMAKE_CURRENT_SOURCE_DIR}/src"
 	third_party/glm
 	third_party/stb
 )
