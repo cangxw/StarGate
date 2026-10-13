@@ -807,56 +807,7 @@ int main()
 				}
 				ImGui::End();
 
-				// 在列表处理之后取得选中物体
-				//此时只是生成界面，实际绘制放在后面。
-				//ImGui::ShowDemoWindow();
-				//ImGui::SetNextWindowPos(ImVec2(260.0f * uiScale, 20.0f * uiScale), ImGuiCond_FirstUseEver);
-				//ImGui::SetNextWindowSize(ImVec2(360.0f * uiScale, 420.0f * uiScale), ImGuiCond_FirstUseEver);
-
-				if (ImGui::Begin("Inspector"))
-				{
-					if (selectedObjectIndex < scene.objects.size())
-					{
-						SceneObject& selectedObject = scene.objects[selectedObjectIndex];
-
-						ImGui::Text(
-							"Selected: %s",
-							selectedObject.name.c_str()
-						);
-
-						ImGui::DragFloat3("Position", glm::value_ptr(selectedObject.position), 0.01f);
-						ImGui::DragFloat3("Rotation", glm::value_ptr(selectedObject.rotation), 0.5f);
-						ImGui::DragFloat3("Scale", glm::value_ptr(selectedObject.scale), 0.01f, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-
-						if (ImGui::Button("Reset Transform"))
-						{
-							selectedObject.position = glm::vec3(0.0f);
-							selectedObject.rotation = glm::vec3(0.0f);
-							selectedObject.scale = glm::vec3(1.0f);
-						}
-					}
-					else
-					{
-						ImGui::TextUnformatted("No object selected.");
-					}
-
-					ImGui::Separator();
-
-					if (!sceneSaveMessage.empty())
-					{
-						ImGui::TextWrapped("%s", sceneSaveMessage.c_str());
-					}
-
-					ImGui::Separator();
-					ImGui::Text("Lighting");
-
-					ImGui::ColorEdit3("Light Color", glm::value_ptr(lightColor));
-					ImGui::SliderFloat("Ambient", &ambientStrength, 0.0f, 1.0f);
-
-					ImGui::Separator();
-					ImGui::Text("FPS:%.1f", ImGui::GetIO().Framerate);
-				}
-				ImGui::End();
+				editorUI.DrawInspector(scene, selectedObjectIndex, lightColor, ambientStrength, sceneSaveMessage);
 
 				// IMGUI的Scene视图
 				bool sceneHovered = false;
