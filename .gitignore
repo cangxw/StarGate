@@ -17,3 +17,6 @@ install_manifest.txt
 .env
 .env.*
 !.env.example
+
+# Local packaging files
+/packaging/
