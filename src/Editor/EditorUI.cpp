@@ -339,3 +339,13 @@ SceneViewState EditorUI::DrawScene(Framebuffer& sceneFramebuffer)
 
 	return state;
 }
+
+EditorKeyboardState EditorUI::ReadKeyboardState()
+{
+	EditorKeyboardState state;
+
+	state.captureKeyboard = ImGui::GetIO().WantCaptureKeyboard;
+	state.deletePressed = ImGui::IsKeyPressed(ImGuiKey_Delete, false);
+
+	return state;
+}

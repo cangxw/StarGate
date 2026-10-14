@@ -439,17 +439,7 @@ int main()
 				lastTime = currentTime;
 
 				// 输入处理
-				if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
-				{
-					glfwSetWindowShouldClose(window, GLFW_TRUE);
-				}
-
-				if (!ImGui::GetIO().WantCaptureKeyboard)
-				{
-					editorInput.UpdateObjectKeyboard(window, scene, selectedObjectIndex, static_cast<float>(deltaTime));
-					editorInput.UpdateLightKeyboard(window, lightColor);
-					editorInput.UpdateCameraKeyboard(window, camera, static_cast<float>(deltaTime));
-				}
+				editorInput.UpdateExitKeyboard(window);
 
 				// 渲染开始
 				// 获取实际绘图区域的宽度和高度
@@ -467,28 +457,18 @@ int main()
 
 				// 开始新的一帧
 				editorUI.BeginFrame();
-
-				if (!ImGui::GetIO().WantCaptureKeyboard &&
-					ImGui::IsKeyPressed(ImGuiKey_Delete, false) &&
-					selectedObjectIndex < scene.objects.size())
+				const EditorKeyboardState keyboardState =editorUI.ReadKeyboardState();
+				if (!keyboardState.captureKeyboard)
 				{
-					scene.objects.erase(
-						scene.objects.begin() +
-						static_cast<std::ptrdiff_t>(selectedObjectIndex)
-					);
+					editorInput.UpdateObjectKeyboard(window, scene, selectedObjectIndex, static_cast<float>(deltaTime));
+					editorInput.UpdateLightKeyboard(window, lightColor);
+					editorInput.UpdateCameraKeyboard(window, camera, static_cast<float>(deltaTime));
 
-					// 删除最后一个物体后，暂时将索引保持为 0；
-					// 后续必须检查是否存在选中物体
-					if (scene.objects.empty())
+					if (keyboardState.deletePressed &&
+						editorInput.DeleteSelectedObject(scene, selectedObjectIndex))
 					{
-						selectedObjectIndex = 0;
+						sceneSaveMessage = "Object deleted. Save Scene to keep changes.";
 					}
-					else if (selectedObjectIndex >= scene.objects.size())
-					{
-						selectedObjectIndex = scene.objects.size() - 1;
-					}
-
-					sceneSaveMessage = "Object deleted. Save Scene to keep changes.";
 				}
 
 				const EditorMenuActions menuActions = editorUI.DrawMenuBar();
@@ -670,3 +650,4 @@ int main()
 	glfwTerminate();
 	return runResult;
 }
+

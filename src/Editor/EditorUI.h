@@ -27,6 +27,13 @@ struct EditorMenuActions
 	bool exit = false;
 };
 
+struct EditorKeyboardState
+{
+	bool captureKeyboard = false;
+	bool deletePressed = false;
+};
+
+
 class EditorUI
 {
 public:
@@ -43,4 +50,5 @@ public:
 	void DrawInspector(SceneData& scene, std::size_t& selectedObjectIndex, glm::vec3& lightColor,
 		float& ambientStrength, const std::string& statusMessage);
 	SceneViewState DrawScene(Framebuffer& sceneFramebuffer);
+	EditorKeyboardState ReadKeyboardState();
 };

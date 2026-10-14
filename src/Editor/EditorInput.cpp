@@ -5,8 +5,9 @@
 #include "SceneData.h"
 
 #include <GLFW/glfw3.h>
+#include <imgui_internal.h>
 
-void EditorInput::UpdateObjectKeyboard(GLFWwindow * window, SceneData & scene, std::size_t selectObjectIndex, float deltaTime)
+void EditorInput::UpdateObjectKeyboard(GLFWwindow* window, SceneData& scene, std::size_t selectObjectIndex, float deltaTime)
 {
 	if (selectObjectIndex >= scene.objects.size())
 		return;
@@ -78,4 +79,35 @@ void EditorInput::UpdateCameraKeyboard(GLFWwindow* window, Camera& camera, float
 	}
 
 	camera.Move(forward, right, static_cast<float>(deltaTime));
+}
+
+void EditorInput::UpdateExitKeyboard(GLFWwindow* window)
+{
+	// 输入处理
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+	{
+		glfwSetWindowShouldClose(window, GLFW_TRUE);
+	}
+}
+bool EditorInput::DeleteSelectedObject(SceneData& scene, std::size_t& selectedObjectIndex)
+{
+	if (selectedObjectIndex >= scene.objects.size())
+	{
+		return false;
+	}
+
+	scene.objects.erase(scene.objects.begin() + static_cast<std::ptrdiff_t>(selectedObjectIndex));
+
+	// 删除最后一个物体后，暂时将索引保持为 0；
+	// 后续必须检查是否存在选中物体
+	if (scene.objects.empty())
+	{
+		selectedObjectIndex = 0;
+	}
+	else if (selectedObjectIndex >= scene.objects.size())
+	{
+		selectedObjectIndex = scene.objects.size() - 1;
+	}
+
+	return true;
 }
