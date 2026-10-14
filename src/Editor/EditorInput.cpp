@@ -1,11 +1,93 @@
 #define GLFW_INCLUDE_NONE
 
 #include "EditorInput.h"
-#include "Camera.h"
-#include "SceneData.h"
+#include "Engine/Camera.h"
+#include "Engine/SceneData.h"
+#include "EditorUI.h"
 
 #include <GLFW/glfw3.h>
-#include <imgui_internal.h>
+
+void EditorInput::InitializeMouse(GLFWwindow* window, Camera& camera)
+{
+	m_MouseState = MouseState{};
+	m_MouseState.camera = &camera;
+
+	glfwSetWindowUserPointer(window, &m_MouseState);
+
+	// 隐藏光标
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	glfwSetCursorPosCallback(window,
+		[](GLFWwindow* window, double xpos, double ypos)
+		{
+			// 取回相机输入状态
+			MouseState* input = static_cast<MouseState*>(glfwGetWindowUserPointer(window));
+
+			if (input == nullptr || input->camera == nullptr)
+			{
+				return;
+			}
+
+			if (!input->cameraControlActive)
+			{
+				//没有控制相机的时候，重置
+				input->firstMouse = true;
+				return;
+			}
+
+			if (input->firstMouse)
+			{
+				input->lastMouseX = xpos;
+				input->lastMouseY = ypos;
+				input->firstMouse = false;
+				return;
+			}
+
+			const float offsetX = static_cast<float>(xpos - input->lastMouseX);
+			const float offsetY = static_cast<float>(input->lastMouseY - ypos);
+
+			input->lastMouseX = xpos;
+			input->lastMouseY = ypos;
+
+			input->camera->Rotate(offsetX, offsetY);
+		}
+	);
+}
+
+void EditorInput::UpdateCameraMouse(GLFWwindow* window, const SceneViewState& sceneView)
+{
+	// 鼠标的处理
+	const bool windowFocused = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
+	const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+
+	//在Scene场景里按下才算开始控制相机
+	const bool startCameraControl = sceneView.hovered && sceneView.rightMouseClicked;
+
+	// 已经开始控制后，保持到松开右键
+	const bool enableCamera =
+		windowFocused &&
+		sceneView.imageVisible &&
+		rightMouseDown &&
+		(m_MouseState.cameraControlActive || startCameraControl);
+
+	if (enableCamera != m_MouseState.cameraControlActive)
+	{
+		m_MouseState.cameraControlActive = enableCamera;
+		m_MouseState.firstMouse = true;
+
+		glfwSetInputMode(window, GLFW_CURSOR,
+			enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
+		);
+	}
+}
+
+void EditorInput::ShutdownMouse(GLFWwindow* window)
+{
+	glfwSetCursorPosCallback(window, nullptr);
+	glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
+
+	m_MouseState = MouseState{};
+}
+
 
 void EditorInput::UpdateObjectKeyboard(GLFWwindow* window, SceneData& scene, std::size_t selectObjectIndex, float deltaTime)
 {

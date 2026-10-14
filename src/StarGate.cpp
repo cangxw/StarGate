@@ -16,8 +16,6 @@
 #include <assimp/version.h>
 #include <limits>
 
-#include <imgui.h>
-
 #include <json11.hpp>
 #include <iterator> // std::size
 #include <string>
@@ -38,17 +36,6 @@
 #include "Editor/EditorUI.h"
 #include "Editor/EditorInput.h"
 #include "Engine/PathUtils.h"
-
-
-struct InputState
-{
-	Camera* camera = nullptr;
-
-	double lastMouseX = 0.0;
-	double lastMouseY = 0.0;
-	bool firstMouse = true;
-	bool cameraControlActive = false;
-};
 
 // 模型路径 → 已加载的模型资源
 using ModelCache = std::unordered_map<std::string, std::unique_ptr<Model>>;
@@ -281,47 +268,6 @@ int main()
 			lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
 
 			Camera camera;
-			InputState inputState;
-			inputState.camera = &camera;
-
-			glfwSetWindowUserPointer(window, &inputState); // 保存输入状态地址，供鼠标回调取回
-
-
-			// 隐藏光标
-			//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-			glfwSetCursorPosCallback(window,
-				[](GLFWwindow* window, double xpos, double ypos)
-				{
-					// 取回相机输入状态
-					InputState* input = static_cast<InputState*>(
-						glfwGetWindowUserPointer(window)
-						);
-
-					if (!input->cameraControlActive)
-					{
-						//没有控制相机的时候，重置
-						input->firstMouse = true;
-						return;
-					}
-
-					if (input->firstMouse)
-					{
-						input->lastMouseX = xpos;
-						input->lastMouseY = ypos;
-						input->firstMouse = false;
-						return;
-					}
-
-					const float offsetX = static_cast<float>(xpos - input->lastMouseX);
-					const float offsetY = static_cast<float>(input->lastMouseY - ypos);
-
-					input->lastMouseX = xpos;
-					input->lastMouseY = ypos;
-
-					input->camera->Rotate(offsetX, offsetY);
-				}
-			);
-
 			std::size_t selectedObjectIndex = 0;
 			EditorUI editorUI;
 			EditorInput editorInput;
@@ -338,6 +284,7 @@ int main()
 			}
 
 			// 创建Imgui上下文
+			editorInput.InitializeMouse(window, camera);	// 先要注册自己的回调
 			editorUI.Initialize(window);
 
 			std::string sceneSaveMessage;
@@ -502,32 +449,7 @@ int main()
 				editorUI.DrawInspector(scene, selectedObjectIndex, lightColor, ambientStrength, sceneSaveMessage);
 				const SceneViewState sceneView = editorUI.DrawScene(sceneFramebuffer);
 
-				const bool sceneHovered = sceneView.hovered;
-				const bool sceneImageVisible = sceneView.imageVisible;
-
-				// 鼠标的处理
-				const bool windowFocused = glfwGetWindowAttrib(window, GLFW_FOCUSED) == GLFW_TRUE;
-				const bool rightMouseDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
-
-				//在Scene场景里按下才算开始控制相机
-				const bool startCameraControl = sceneHovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right);
-
-				// 已经开始控制后，保持到松开右键
-				const bool enableCamera =
-					windowFocused &&
-					sceneImageVisible &&
-					rightMouseDown &&
-					(inputState.cameraControlActive || startCameraControl);
-
-				if (enableCamera != inputState.cameraControlActive)
-				{
-					inputState.cameraControlActive = enableCamera;
-					inputState.firstMouse = true;
-
-					glfwSetInputMode( window, GLFW_CURSOR,
-						enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
-					);
-				}
+				editorInput.UpdateCameraMouse(window, sceneView);
 
 				const float aspectRatio = static_cast<float>(sceneFramebuffer.GetWidth()) / static_cast<float>(sceneFramebuffer.GetHeight());
 				// 使用正交投影矩阵，确保三角形在不同窗口尺寸下保持正确的比例
@@ -639,10 +561,7 @@ int main()
 			}
 
 			editorUI.Shutdown();
-
-			glfwSetCursorPosCallback(window, nullptr);
-			glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
-
+			editorInput.ShutdownMouse(window);
 			return 0;
 		}();
 	// Shader已经释放，现在销毁OpenGL Context

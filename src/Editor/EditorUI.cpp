@@ -7,7 +7,7 @@
 
 #include "EditorUI.h"
 #include "Engine/PathUtils.h"
-#include "Framebuffer.h"
+#include "Engine/Framebuffer.h"
 
 static bool IsModelFile(const std::filesystem::path& path)
 {
@@ -332,6 +332,7 @@ SceneViewState EditorUI::DrawScene(Framebuffer& sceneFramebuffer)
 			ImGui::Image(sceneTexture, sceneSize, ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
 
 			state.hovered = ImGui::IsItemHovered();
+			state.rightMouseClicked = ImGui::IsMouseClicked(ImGuiMouseButton_Right);
 			state.imageVisible = true;	//如果 Scene 面板折叠了，或者内部没有足够的显示空间，这段代码不会执行，变量就保持 false。
 		}
 	}
