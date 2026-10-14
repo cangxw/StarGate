@@ -1,6 +1,5 @@
 ﻿// StarGate.cpp: 定义应用程序的入口点。
 //
-
 #define GLFW_INCLUDE_NONE
 #define NOMINMAX // 防止Windows.h中定义的min和max宏与std::min和std::max冲突
 #include <glad/gl.h>
@@ -37,6 +36,7 @@
 #include "SceneData.h"
 #include "SceneSerializer.h"
 #include "Editor/EditorUI.h"
+#include "Editor/EditorInput.h"
 #include "Engine/PathUtils.h"
 
 
@@ -280,38 +280,19 @@ int main()
 			const bool timerResolutionEnabled = timeBeginPeriod(1) == TIMERR_NOERROR; // 设置系统定时器分辨率为1ms
 			lastTime = glfwGetTime(); // 重新记录进入主循环前的时间
 
-			const float moveSpeed = 0.8f; // 偏移量变化速度
-			const float rotationSpeed = 90.0f; // 旋转速度，单位为度每秒
-
 			Camera camera;
 			InputState inputState;
 			inputState.camera = &camera;
 
-			glfwSetWindowUserPointer(window, &inputState); // 将缩放因子指针存储在窗口的用户指针中
+			glfwSetWindowUserPointer(window, &inputState); // 保存输入状态地址，供鼠标回调取回
 
-			//glfwSetScrollCallback(
-			//	window,
-			//	[](GLFWwindow* window, double, double yoffset)
-			//	{
-			//		InputState* input = static_cast<InputState*>(
-			//			glfwGetWindowUserPointer(window)
-			//			);
-
-			//		input->scaleFactor += static_cast<float>(yoffset) * 0.1f;
-
-			//		if (input->scaleFactor < 0.1f)
-			//		{
-			//			input->scaleFactor = 0.1f;
-			//		}
-			//	}
-			//);
 
 			// 隐藏光标
 			//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 			glfwSetCursorPosCallback(window,
 				[](GLFWwindow* window, double xpos, double ypos)
 				{
-					// 取回缩放变量的地址
+					// 取回相机输入状态
 					InputState* input = static_cast<InputState*>(
 						glfwGetWindowUserPointer(window)
 						);
@@ -343,6 +324,7 @@ int main()
 
 			std::size_t selectedObjectIndex = 0;
 			EditorUI editorUI;
+			EditorInput editorInput;
 
 			// 显示鼠标
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -456,9 +438,6 @@ int main()
 				const double deltaTime = currentTime - lastTime;
 				lastTime = currentTime;
 
-				// static_cast<float> 将 double 类型的 deltaTime 转换为 float 类型，以便与 moveSpeed 相乘
-				const float moveDistance = moveSpeed * static_cast<float>(deltaTime);
-
 				// 输入处理
 				if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 				{
@@ -467,70 +446,9 @@ int main()
 
 				if (!ImGui::GetIO().WantCaptureKeyboard)
 				{
-					if (selectedObjectIndex < scene.objects.size())
-					{
-						SceneObject& ketboardObject = scene.objects[selectedObjectIndex];
-
-						if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS)
-						{
-							ketboardObject.position.x -= moveDistance;
-						}
-
-						if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS)
-						{
-							ketboardObject.position.x += moveDistance;
-						}
-
-						const float rotationStep = rotationSpeed * static_cast<float>(deltaTime); // 计算本帧的旋转角度增量
-						if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-						{
-							ketboardObject.rotation.y += rotationStep; // 逆时针旋转
-						}
-						if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-						{
-							ketboardObject.rotation.y -= rotationStep; // 顺时针旋转
-						}
-					}
-
-
-					// 切换灯光颜色
-					if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
-					{
-						lightColor = glm::vec3(1.0f, 1.0f, 1.0f); // 白光
-					}
-					else if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
-					{
-						lightColor = glm::vec3(1.0f, 0.8f, 0.5f); // 暖色
-					}
-					else if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
-					{
-						lightColor = glm::vec3(0.4f, 0.7f, 1.0f); // 冷色
-					}
-
-					float forward = 0.0f;
-					float right = 0.0f;
-
-					if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-					{
-						forward += 1.0f;
-					}
-
-					if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-					{
-						forward -= 1.0f;
-					}
-
-					if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-					{
-						right -= 1.0f;
-					}
-
-					if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-					{
-						right += 1.0f;
-					}
-
-					camera.Move(forward, right, static_cast<float>(deltaTime));
+					editorInput.UpdateObjectKeyboard(window, scene, selectedObjectIndex, static_cast<float>(deltaTime));
+					editorInput.UpdateLightKeyboard(window, lightColor);
+					editorInput.UpdateCameraKeyboard(window, camera, static_cast<float>(deltaTime));
 				}
 
 				// 渲染开始
@@ -597,7 +515,6 @@ int main()
 					glfwSetWindowShouldClose(window, GLFW_TRUE);
 				}
 
-				const ImGuiIO& io = ImGui::GetIO();
 				// 在主窗口的工作区域创建停靠空间
 				editorUI.DrawDockSpace();
 				editorUI.DrawHierarchy(scene, selectedObjectIndex);
@@ -630,15 +547,6 @@ int main()
 					glfwSetInputMode( window, GLFW_CURSOR,
 						enableCamera ? GLFW_CURSOR_DISABLED : GLFW_CURSOR_NORMAL
 					);
-				}
-
-				// 鼠标位于场景画面上时，滚轮缩放选中的物体
-				if (windowFocused && sceneHovered && selectedObjectIndex < scene.objects.size())
-				{
-					SceneObject& scrollObject = scene.objects[selectedObjectIndex];
-
-					scrollObject.scale += glm::vec3(io.MouseWheel * 0.1f);
-					scrollObject.scale = glm::max(scrollObject.scale, 0.1f);
 				}
 
 				const float aspectRatio = static_cast<float>(sceneFramebuffer.GetWidth()) / static_cast<float>(sceneFramebuffer.GetHeight());
@@ -677,7 +585,7 @@ int main()
 				shader.SetVec3("uCameraPosition", camera.GetPosition());
 
 				shader.SetMat4("uView", view);
-				shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器)
+				shader.SetMat4("uProjection", projection); // 将投影矩阵传递给着色器
 
 				for (const SceneObject& object : scene.objects)
 				{
@@ -753,7 +661,6 @@ int main()
 			editorUI.Shutdown();
 
 			glfwSetCursorPosCallback(window, nullptr);
-			glfwSetScrollCallback(window, nullptr); // 取消滚轮回调，避免悬空指针
 			glfwSetWindowUserPointer(window, nullptr); // 清除窗口的用户指针，避免悬空指针
 
 			return 0;

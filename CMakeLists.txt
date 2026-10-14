@@ -101,6 +101,8 @@ add_executable (StarGate
 	"src/SceneData.h"
 	"src/Editor/EditorUI.h"
 	"src/Editor/EditorUI.cpp"
+	"src/Editor/EditorInput.h"
+	"src/Editor/EditorInput.cpp"
 	"src/Engine/PathUtils.h"
 )
 
