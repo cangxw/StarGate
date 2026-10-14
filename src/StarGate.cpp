@@ -26,13 +26,13 @@
 #include <unordered_map>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
-#include "Shader.h"
-#include "Camera.h"
-#include "SceneObject.h"
-#include "Model.h"
-#include "Framebuffer.h"
-#include "SceneData.h"
-#include "SceneSerializer.h"
+#include "Engine/Shader.h"
+#include "Engine/Camera.h"
+#include "Engine/SceneObject.h"
+#include "Engine/Model.h"
+#include "Engine/Framebuffer.h"
+#include "Engine/SceneData.h"
+#include "Engine/SceneSerializer.h"
 #include "Editor/EditorUI.h"
 #include "Editor/EditorInput.h"
 #include "Engine/PathUtils.h"
