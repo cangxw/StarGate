@@ -305,6 +305,23 @@ int main()
 				std::cout << "Copied root node: " << animationData.rootNode.name << '\n';
 
 				std::cout << "Root children: " << animationData.rootNode.children.size() << '\n';
+
+
+				for (const AnimationClip& clip : animationData.clips)
+				{
+					std::cout << "Clip: " << clip.name << ", Channels: " << clip.channels.size() << '\n';
+
+					if (!clip.channels.empty())
+					{
+						const AnimationChannel& channel = clip.channels.front();
+
+						std::cout << "First channel: " << channel.nodeName
+							<< ", Position keys: " << channel.positions.size()
+							<< ", Rotation keys: " << channel.rotations.size()
+							<< ", Scale keys: " << channel.scales.size()
+							<< '\n';
+					}
+				}
 			}
 
 			// 主循环

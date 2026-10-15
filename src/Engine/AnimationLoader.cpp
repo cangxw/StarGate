@@ -49,6 +49,76 @@ namespace
 
 		return result;
 	}
+
+	AnimationChannel CopyAnimationChannel(const aiNodeAnim* source)
+	{
+		AnimationChannel result;
+
+		result.nodeName = source->mNodeName.C_Str();
+		result.positions.reserve(source->mNumPositionKeys);
+		result.rotations.reserve(source->mNumRotationKeys);
+		result.scales.reserve(source->mNumScalingKeys);
+
+		// 位置关键帧
+		for (unsigned int i = 0; i < source->mNumPositionKeys; ++i)
+		{
+			const aiVectorKey& key = source->mPositionKeys[i];
+
+			result.positions.push_back({
+				key.mTime,
+				glm::vec3(key.mValue.x, key.mValue.y, key.mValue.z)
+				});
+		}
+
+		// 旋转关键帧
+		for (unsigned int i = 0; i < source->mNumRotationKeys; ++i)
+		{
+			const aiQuatKey& key = source->mRotationKeys[i];
+
+			result.rotations.push_back({
+				key.mTime,
+				glm::quat(
+					key.mValue.w,
+					key.mValue.x,
+					key.mValue.y,
+					key.mValue.z
+				)
+				});
+		}
+
+		// 缩放关键帧
+		for (unsigned int i = 0; i < source->mNumScalingKeys; ++i)
+		{
+			const aiVectorKey& key = source->mScalingKeys[i];
+
+			result.scales.push_back({
+				key.mTime,
+				glm::vec3(key.mValue.x, key.mValue.y, key.mValue.z)
+				});
+		}
+
+		return result;
+	}
+
+	AnimationClip CopyAnimationClip(const aiAnimation* source)
+	{
+		AnimationClip result;
+
+		result.name = source->mName.C_Str();
+		result.durationTicks = source->mDuration;
+		result.ticksPerSecond = source->mTicksPerSecond;
+
+		result.channels.reserve(source->mNumChannels);
+
+		for (unsigned int i = 0; i < source->mNumChannels; ++i)
+		{
+			result.channels.push_back(
+				CopyAnimationChannel(source->mChannels[i])
+			);
+		}
+
+		return result;
+	}
 }
 
 bool LoadAnimationData(const char* path, AnimationData& data)
@@ -105,6 +175,12 @@ bool LoadAnimationData(const char* path, AnimationData& data)
 
 	AnimationData result;
 	result.rootNode = CopyNodeHierarchy(scene->mRootNode);
+
+	result.clips.reserve(scene->mNumAnimations);
+	for (unsigned int i = 0; i < scene->mNumAnimations; ++i)
+	{
+		result.clips.push_back(CopyAnimationClip(scene->mAnimations[i]));
+	}
 
 	//局部变量 importer 析构后，它拥有的 aiScene、aiNode 等数据就会被释放。 
 	// 我们保存的是自己的字符串、矩阵和子节点，不再依赖那些指针。
