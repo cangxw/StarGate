@@ -36,6 +36,7 @@
 #include "Editor/EditorUI.h"
 #include "Editor/EditorInput.h"
 #include "Engine/PathUtils.h"
+#include "Engine/AnimationLoader.h"
 
 // 模型路径 → 已加载的模型资源
 using ModelCache = std::unordered_map<std::string, std::unique_ptr<Model>>;
@@ -294,6 +295,17 @@ int main()
 			// 资产目录
 			const std::filesystem::path assetRoot = STARGATE_ASSET_DIR;
 			std::filesystem::path currentAssetDirectory = assetRoot;
+
+			AnimationData animationData;
+			if (LoadAnimationData(
+				STARGATE_ASSET_DIR "/models/pale_knight/source/knight.fbx",
+				animationData
+			))
+			{
+				std::cout << "Copied root node: " << animationData.rootNode.name << '\n';
+
+				std::cout << "Root children: " << animationData.rootNode.children.size() << '\n';
+			}
 
 			// 主循环
 			while (!glfwWindowShouldClose(window))
