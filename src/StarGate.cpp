@@ -37,6 +37,7 @@
 #include "Editor/EditorInput.h"
 #include "Engine/PathUtils.h"
 #include "Engine/AnimationLoader.h"
+#include "Engine/AnimationSampler.h"
 
 // 模型路径 → 已加载的模型资源
 using ModelCache = std::unordered_map<std::string, std::unique_ptr<Model>>;
@@ -322,7 +323,137 @@ int main()
 							<< '\n';
 					}
 				}
+
+				const std::vector<PositionKey> testKeys = {
+					{ 0.0,  glm::vec3(0.0f, 0.0f, 0.0f) },
+					{ 10.0, glm::vec3(10.0f, 0.0f, 0.0f) }
+				};
+
+				const glm::vec3 sampledPosition = SamplePosition(
+					testKeys,
+					5.0,
+					glm::vec3(0.0f)
+				);
+
+				std::cout << "Sampled position: "
+					<< sampledPosition.x << ", "
+					<< sampledPosition.y << ", "
+					<< sampledPosition.z << '\n';
 			}
+
+			const std::vector<ScaleKey> scaleKeys = {
+				{ 0.0,  glm::vec3(1.0f) },
+				{ 10.0, glm::vec3(3.0f) }
+			};
+
+			const glm::vec3 scale = SampleScale(
+				scaleKeys, 5.0, glm::vec3(1.0f)
+			);
+
+			std::cout << "Sampled scale: "
+				<< scale.x << ", "
+				<< scale.y << ", "
+				<< scale.z << '\n';
+
+			const std::vector<RotationKey> rotationKeys = {
+	{ 0.0, glm::quat(1.0f, 0.0f, 0.0f, 0.0f) },
+	{
+		10.0,
+		glm::angleAxis(
+			glm::radians(90.0f),
+			glm::vec3(0.0f, 0.0f, 1.0f)
+		)
+	}
+			};
+
+			const glm::quat rotation = SampleRotation(
+				rotationKeys,
+				5.0,
+				glm::quat(1.0f, 0.0f, 0.0f, 0.0f)
+			);
+
+			// 用旋转后的方向验证结果
+			const glm::vec3 direction =
+				rotation * glm::vec3(1.0f, 0.0f, 0.0f);
+
+			std::cout << "Rotated direction: "
+				<< direction.x << ", "
+				<< direction.y << ", "
+				<< direction.z << '\n';
+
+
+			AnimationNode testNode;
+			testNode.name = "TestNode";
+			testNode.defaultScale = glm::vec3(2.0f);
+
+			testNode.localTransform = glm::scale(
+				glm::mat4(1.0f),
+				testNode.defaultScale
+			);
+
+			AnimationChannel testChannel;
+			testChannel.nodeName = "TestNode";
+
+			testChannel.positions = {
+				{ 0.0,  glm::vec3(0.0f) },
+				{ 10.0, glm::vec3(10.0f, 0.0f, 0.0f) }
+			};
+
+			const glm::mat4 sampledTransform = SampleNodeTransform(
+				testNode,
+				&testChannel,
+				5.0
+			);
+
+			const glm::vec4 transformedPoint =
+				sampledTransform * glm::vec4(1.0f, 0.0f, 0.0f, 1.0f);
+
+			std::cout << "Transformed point: "
+				<< transformedPoint.x << ", "
+				<< transformedPoint.y << ", "
+				<< transformedPoint.z << '\n';
+
+			AnimationNode parentNode;
+			parentNode.name = "Parent";
+
+			// 父节点：沿 X 平移 10，再带有 2 倍缩放
+			parentNode.defaultPosition = glm::vec3(10.0f, 0.0f, 0.0f);
+			parentNode.defaultScale = glm::vec3(2.0f);
+
+			parentNode.localTransform =
+				glm::translate(glm::mat4(1.0f), parentNode.defaultPosition)
+				* glm::scale(glm::mat4(1.0f), parentNode.defaultScale);
+
+			AnimationNode childNode;
+			childNode.name = "Child";
+
+			// 子节点：相对父节点，沿 X 平移 2
+			childNode.defaultPosition = glm::vec3(2.0f, 0.0f, 0.0f);
+
+			childNode.localTransform = glm::translate(
+				glm::mat4(1.0f),
+				childNode.defaultPosition
+			);
+
+			parentNode.children.push_back(childNode);
+
+			AnimationPose testPose;
+
+			SampleAnimationPose(
+				parentNode,
+				nullptr,
+				0.0,
+				testPose
+			);
+
+			const glm::vec4 childPosition =
+				testPose.globalTransforms.at("Child")
+				* glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+
+			std::cout << "Child position: "
+				<< childPosition.x << ", "
+				<< childPosition.y << ", "
+				<< childPosition.z << '\n';
 
 			// 主循环
 			while (!glfwWindowShouldClose(window))

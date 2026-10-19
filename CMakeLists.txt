@@ -103,6 +103,8 @@ add_executable (StarGate
 	"src/Engine/AnimationLoader.h"
 	"src/Engine/AnimationLoader.cpp"
 	"src/Engine/AnimationData.h"
+	"src/Engine/AnimationSampler.h"
+	"src/Engine/AnimationSampler.cpp"
 	"src/Editor/EditorUI.h"
 	"src/Editor/EditorUI.cpp"
 	"src/Editor/EditorInput.h"

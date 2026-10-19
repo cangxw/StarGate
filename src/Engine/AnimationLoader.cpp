@@ -40,6 +40,16 @@ namespace
 		result.name = source->mName.C_Str();
 		result.localTransform = ToGlmMatrix(source->mTransformation);
 
+		aiVector3D position;
+		aiQuaternion rotation;
+		aiVector3D scale;
+
+		// Assimp ：缩放，旋转，位置
+		source->mTransformation.Decompose(scale, rotation, position);
+		result.defaultPosition = glm::vec3(position.x, position.y, position.z);
+		result.defaultRotation = glm::quat(rotation.w, rotation.x, rotation.y, rotation.z);
+		result.defaultScale = glm::vec3(scale.x, scale.y, scale.z);
+
 		// 已知孩子数量，提前准备存储空间
 		result.children.reserve(source->mNumChildren);
 		for (unsigned int i = 0; i < source->mNumChildren; ++i)

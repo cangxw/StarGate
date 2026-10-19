@@ -4,6 +4,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <unordered_map>
 
 // 模型中的一个节点，可能是骨骼，也可能是普通节点
 struct AnimationNode
@@ -15,6 +16,11 @@ struct AnimationNode
 
 	// 当前节点的所有孩子
 	std::vector<AnimationNode> children;
+
+	// 从原始局部矩阵中分解出的默认值
+	glm::vec3 defaultPosition{ 0.0f };
+	glm::quat defaultRotation{ 1.0f, 0.0f, 0.0f, 0.0f };
+	glm::vec3 defaultScale{ 1.0f };
 };
 
 // 一个位置关键帧
@@ -78,4 +84,11 @@ struct AnimationData
 
 	// 模型包含的所有动画
 	std::vector<AnimationClip> clips;
+};
+
+// 某个时刻，整棵节点树的姿势
+struct AnimationPose
+{
+	// 节点名字，从根节点累计下来的变换矩阵
+	std::unordered_map<std::string, glm::mat4> globalTransforms;
 };
