@@ -24,6 +24,7 @@
 #include <memory>	//管理动态创建的对象 比如make_unique
 #include <utility>	// 提供移动等通用工具 std::move等
 #include <unordered_map>
+#include <cmath>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
 #include "Engine/Shader.h"
@@ -455,6 +456,12 @@ int main()
 				<< childPosition.y << ", "
 				<< childPosition.z << '\n';
 
+			double animationTimeTicks = 0.0;
+			double animationLogTimer = 0.0;
+
+			AnimationPose animatedPose;
+			lastTime = glfwGetTime(); // 前面加载模型和动画可能耗时，这里重新记录时间
+
 			// 主循环
 			while (!glfwWindowShouldClose(window))
 			{
@@ -544,6 +551,42 @@ int main()
 				const double currentTime = glfwGetTime();
 				const double deltaTime = currentTime - lastTime;
 				lastTime = currentTime;
+
+				if (!animationData.clips.empty())
+				{
+					// 先播放第一段动画
+					const AnimationClip& clip = animationData.clips.front();
+
+					if (clip.durationTicks > 0.0 && clip.ticksPerSecond > 0.0)
+					{
+						// 把这一帧经过的秒数转换为动画tick
+						// 动画时间前进：0.02 × 25 = 0.5 tick
+						animationTimeTicks += deltaTime * clip.ticksPerSecond;
+
+						// 播放到结尾后，从头循环
+						animationTimeTicks = std::fmod(
+							animationTimeTicks,
+							clip.durationTicks
+						);
+					}
+
+					SampleAnimationPose(animationData.rootNode, &clip, animationTimeTicks, animatedPose);
+
+					// 每秒输出一次，避免刷屏
+					animationLogTimer += deltaTime;
+
+					if (animationLogTimer > 1.0)
+					{
+						animationLogTimer = 0.0;
+
+						std::cout << "Animation time: "
+							<< animationTimeTicks << " / "
+							<< clip.durationTicks
+							<< ", Nodes: "
+							<< animatedPose.globalTransforms.size()
+							<< '\n';
+					}
+				}
 
 				// 输入处理
 				editorInput.UpdateExitKeyboard(window);

@@ -1,4 +1,5 @@
 #include "AnimationLoader.h"
+#include "SkinnedModelData.h"
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -128,6 +129,126 @@ namespace
 		}
 
 		return result;
+	}
+
+	void AddBoneInfluence(SkinnedVertex& vertex, int boneIndex, float weight)
+	{
+		if (weight <= 0.0f)
+			return;
+
+		// 找出四个位置中权重最小的一个
+		int smallestSlot = 0;
+		for (int i = 1; i < 4; ++i)
+		{
+			if (vertex.boneWeights[i] < vertex.boneWeights[smallestSlot])
+				smallestSlot = i;
+		}
+
+		// 保留影响最大的四根骨骼
+		if (weight > vertex.boneWeights[smallestSlot])
+		{
+			vertex.boneIndices[smallestSlot] = boneIndex;
+			vertex.boneWeights[smallestSlot] = weight;
+		}
+	}
+
+	bool CopySkinnedMesh(const aiMesh* source, const std::string& nodeName, SkinnedMeshData& data)
+	{
+		if (!source->HasPositions() || !source->HasNormals() ||
+			!source->HasFaces())
+		{
+			std::cerr << "Skinned mesh is missing required data.\n";
+			return false;
+		}
+
+
+		SkinnedMeshData result;
+		result.nodeName = nodeName;
+		result.materialIndex = source->mMaterialIndex;
+		result.vertices.resize(source->mNumVertices);
+
+		// 复制顶点信息
+		for (unsigned int i = 0; i < source->mNumVertices; ++i)
+		{
+			SkinnedVertex& vertex = result.vertices[i];
+
+			const aiVector3D& position = source->mVertices[i];
+			const aiVector3D& normal = source->mNormals[i];
+
+			vertex.position = glm::vec3(position.x, position.y, position.z);
+			vertex.normal = glm::vec3(normal.x, normal.y, normal.z);
+
+			if (source->HasTextureCoords(0))
+			{
+				const aiVector3D& uv = source->mTextureCoords[0][i];
+				vertex.texCoord = glm::vec2(uv.x, uv.y);
+			}
+		}
+
+		// 复制三角形索引
+		for (unsigned int i = 0; i < source->mNumFaces; ++i)
+		{
+			const aiFace& face = source->mFaces[i];
+			if (face.mNumIndices != 3)
+			{
+				std::cerr << "Skinned mesh contains a non-triangle face.\n";
+				return false;
+			}
+
+			for (unsigned int j = 0; j < 3; ++j)
+			{
+				const unsigned int index = face.mIndices[j];
+
+				if (index >= source->mNumVertices)
+				{
+					std::cerr << "Invalid skinned mesh index.\n";
+					return false;
+				}
+
+				result.indices.push_back(index);
+			}
+
+			// 复制骨骼，并把影响写入对应的顶点
+			result.bones.reserve(source->mNumBones);
+
+			for (unsigned int i = 0; i < source->mNumBones; ++i)
+			{
+				const aiBone* bone = source->mBones[i];
+
+				BoneInfo info;
+				info.nodeName = bone->mName.C_Str();
+				info.offsetMatrix = ToGlmMatrix(bone->mOffsetMatrix);
+
+				result.bones.push_back(std::move(info));
+
+				for (unsigned int j = 0; j < bone->mNumWeights; ++j)
+				{
+					const aiVertexWeight& influence = bone->mWeights[j];
+
+					if (influence.mVertexId >= result.vertices.size())
+					{
+						std::cerr << "Invalid bone vertex index.\n";
+						return false;
+					}
+
+					AddBoneInfluence( result.vertices[influence.mVertexId], static_cast<int>(i), influence.mWeight);
+				}
+			}
+
+			// 保留四个影响后，重新让权重之和等于 1
+			for (SkinnedVertex& vertex : result.vertices)
+			{
+				const float total = vertex.boneWeights.x + vertex.boneWeights.y + vertex.boneWeights.z + vertex.boneWeights.w;
+
+				if (total > 0.0f)
+				{
+					vertex.boneWeights /= total;
+				}
+			}
+
+			data = std::move(result);
+			return true;
+		}
 	}
 }
 
