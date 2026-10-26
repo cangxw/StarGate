@@ -2,6 +2,9 @@
 
 #include <glad/gl.h>
 #include <cstddef>
+#include <vector>
+
+struct SkinnedVertex;
 
 class Mesh
 {
@@ -13,11 +16,18 @@ public:
 		GLsizei indexCount
 	);
 
+	Mesh(
+		const std::vector<SkinnedVertex>& vertices,
+		const std::vector<unsigned int>& indices
+	);
+
 	~Mesh();
 	
 	void Draw() const;
 
 	void Draw(std::size_t firstIndex, GLsizei indexCount) const;
+
+	bool IsValid() const;
 
 	//禁止复制
 	Mesh(const Mesh&) = delete;

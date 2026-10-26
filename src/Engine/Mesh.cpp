@@ -1,4 +1,8 @@
 #include "Mesh.h"
+#include "SkinnedModelData.h"
+
+#include<iostream>
+#include <limits>
 
 Mesh::Mesh(
 	const float* vertices,
@@ -71,6 +75,97 @@ Mesh::Mesh(
 	glBindVertexArray(0);
 }
 
+Mesh::Mesh(const std::vector<SkinnedVertex>& vertices,
+	const std::vector<unsigned int>& indices)
+{
+	if (vertices.empty() || indices.empty())
+		return;
+
+	const std::size_t maxBufferSize = static_cast<std::size_t>(std::numeric_limits<GLsizeiptr>::max());
+
+	if (indices.size() > static_cast<std::size_t>(
+		std::numeric_limits<GLsizei>::max()) ||
+		vertices.size() > maxBufferSize / sizeof(SkinnedVertex) ||
+		indices.size() > maxBufferSize / sizeof(unsigned int))
+	{
+		std::cerr << "Skinned mesh is too large.\n";
+		return;
+	}
+
+	m_IndexCount = static_cast<GLsizei>(indices.size());
+
+	glGenVertexArrays(1, &m_VAO);
+	glBindVertexArray(m_VAO);
+
+	// 上传完整的顶点结构体数组
+	glGenBuffers(1, &m_VBO);
+	glBindBuffer(GL_ARRAY_BUFFER, m_VBO);
+	glBufferData(
+		GL_ARRAY_BUFFER,
+		static_cast<GLsizeiptr>(vertices.size() * sizeof(SkinnedVertex)),
+		vertices.data(),
+		GL_STATIC_DRAW
+	);
+
+	glGenBuffers(1, &m_EBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_EBO);
+	glBufferData(
+		GL_ELEMENT_ARRAY_BUFFER,
+		static_cast<GLsizeiptr>(indices.size() * sizeof(unsigned int)),
+		indices.data(),
+		GL_STATIC_DRAW
+	);
+
+	const GLsizei stride = static_cast<GLsizei>(sizeof(SkinnedVertex));
+
+	// 属性0：位置
+	glVertexAttribPointer(
+		0, 3, GL_FLOAT, GL_FALSE, stride,
+		reinterpret_cast<const void*>(
+			offsetof(SkinnedVertex, position)
+			)
+	);
+	glEnableVertexAttribArray(0);
+
+	// 属性1：UV
+	glVertexAttribPointer(
+		1, 2, GL_FLOAT, GL_FALSE, stride,
+		reinterpret_cast<const void*>(
+			offsetof(SkinnedVertex, texCoord)
+			)
+	);
+	glEnableVertexAttribArray(1);
+
+	// 属性2：法线
+	glVertexAttribPointer(
+		2, 3, GL_FLOAT, GL_FALSE, stride,
+		reinterpret_cast<const void*>(
+			offsetof(SkinnedVertex, normal)
+			)
+	);
+	glEnableVertexAttribArray(2);
+
+	// 属性3：骨骼编号，必须作为整数传递
+	glVertexAttribIPointer(
+		3, 4, GL_INT, stride,
+		reinterpret_cast<const void*>(
+			offsetof(SkinnedVertex, boneIndices)
+			)
+	);
+	glEnableVertexAttribArray(3);
+
+	// 属性4：骨骼权重
+	glVertexAttribPointer(
+		4, 4, GL_FLOAT, GL_FALSE, stride,
+		reinterpret_cast<const void*>(
+			offsetof(SkinnedVertex, boneWeights)
+			)
+	);
+	glEnableVertexAttribArray(4);
+
+	glBindVertexArray(0);
+}
+
 Mesh::~Mesh()
 {
 	glDeleteVertexArrays(1, &m_VAO);
@@ -107,4 +202,12 @@ void Mesh::Draw(std::size_t firstIndex, GLsizei indexCount) const
 	);
 
 	glBindVertexArray(0);
+}
+
+bool Mesh::IsValid() const
+{
+	return m_VAO != 0 &&
+		m_VBO != 0 &&
+		m_EBO != 0 &&
+		m_IndexCount > 0;
 }

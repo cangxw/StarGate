@@ -298,10 +298,13 @@ int main()
 			const std::filesystem::path assetRoot = STARGATE_ASSET_DIR;
 			std::filesystem::path currentAssetDirectory = assetRoot;
 
-			AnimationData animationData;
-			if (LoadAnimationData(
+			SkinnedModelData skinnedModelData;
+			AnimationData& animationData = skinnedModelData.animation;
+			std::vector<std::unique_ptr<Mesh>> skinnedMeshes;
+
+			if (LoadSkinnedModelData(
 				STARGATE_ASSET_DIR "/models/pale_knight/source/knight.fbx",
-				animationData
+				skinnedModelData
 			))
 			{
 				std::cout << "Copied root node: " << animationData.rootNode.name << '\n';
@@ -340,6 +343,43 @@ int main()
 					<< sampledPosition.x << ", "
 					<< sampledPosition.y << ", "
 					<< sampledPosition.z << '\n';
+
+
+				std::cout << "Skinned meshes: "
+					<< skinnedModelData.meshes.size() << '\n';
+
+				std::cout << "Materials: "
+					<< skinnedModelData.materials.size() << '\n';
+
+				for (const SkinnedMeshData& mesh : skinnedModelData.meshes)
+				{
+					std::cout << "Node: " << mesh.nodeName
+						<< ", Vertices: " << mesh.vertices.size()
+						<< ", Triangles: " << mesh.indices.size() / 3
+						<< ", Bones: " << mesh.bones.size()
+						<< '\n';
+				}
+
+				skinnedMeshes.reserve(skinnedModelData.meshes.size());
+
+				for (const SkinnedMeshData& meshData : skinnedModelData.meshes)
+				{
+					auto gpuMesh = std::make_unique<Mesh>(
+						meshData.vertices,
+						meshData.indices
+					);
+
+					if (!gpuMesh->IsValid())
+					{
+						std::cerr << "Failed to create skinned GPU mesh.\n";
+						return -1;
+					}
+
+					skinnedMeshes.push_back(std::move(gpuMesh));
+				}
+
+				std::cout << "Created skinned GPU meshes: "
+					<< skinnedMeshes.size() << '\n';
 			}
 
 			const std::vector<ScaleKey> scaleKeys = {
@@ -607,7 +647,7 @@ int main()
 
 				// 开始新的一帧
 				editorUI.BeginFrame();
-				const EditorKeyboardState keyboardState =editorUI.ReadKeyboardState();
+				const EditorKeyboardState keyboardState = editorUI.ReadKeyboardState();
 				if (!keyboardState.captureKeyboard)
 				{
 					editorInput.UpdateObjectKeyboard(window, scene, selectedObjectIndex, static_cast<float>(deltaTime));
