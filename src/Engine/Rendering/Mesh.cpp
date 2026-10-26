@@ -1,5 +1,5 @@
 #include "Mesh.h"
-#include "SkinnedModelData.h"
+#include "Engine/Assets/SkinnedModelData.h"
 
 #include<iostream>
 #include <limits>

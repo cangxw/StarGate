@@ -27,18 +27,18 @@
 #include <cmath>
 
 //#include <GL/gl.h> // OpenGL 的基础函数声明、类型和常量
-#include "Engine/Shader.h"
-#include "Engine/Camera.h"
-#include "Engine/SceneObject.h"
-#include "Engine/Model.h"
-#include "Engine/Framebuffer.h"
-#include "Engine/SceneData.h"
-#include "Engine/SceneSerializer.h"
+#include "Engine/Rendering/Shader.h"
+#include "Engine/Scene/Camera.h"
+#include "Engine/Scene/SceneObject.h"
+#include "Engine/Rendering/Model.h"
+#include "Engine/Rendering/Framebuffer.h"
+#include "Engine/Scene/SceneData.h"
+#include "Engine/Scene/SceneSerializer.h"
 #include "Editor/EditorUI.h"
 #include "Editor/EditorInput.h"
-#include "Engine/PathUtils.h"
-#include "Engine/AnimationLoader.h"
-#include "Engine/AnimationSampler.h"
+#include "Engine/Core/PathUtils.h"
+#include "Engine/Assets/AnimationLoader.h"
+#include "Engine/Animation/AnimationSampler.h"
 
 // 模型路径 → 已加载的模型资源
 using ModelCache = std::unordered_map<std::string, std::unique_ptr<Model>>;

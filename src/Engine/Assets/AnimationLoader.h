@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AnimationData.h"
+#include "Engine/Animation/AnimationData.h"
 #include "SkinnedModelData.h"
 
 bool LoadAnimationData(const char* path, AnimationData& data);

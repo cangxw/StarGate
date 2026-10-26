@@ -4,7 +4,7 @@
 #include <vector>
 #include <glm/glm.hpp>
 
-#include "AnimationData.h"
+#include "Engine/Animation/AnimationData.h"
 #include "MaterialData.h"
 
 // 一个带骨骼影响信息的顶点

@@ -6,8 +6,8 @@
 #include <imgui_impl_opengl3.h>
 
 #include "EditorUI.h"
-#include "Engine/PathUtils.h"
-#include "Engine/Framebuffer.h"
+#include "Engine/Core/PathUtils.h"
+#include "Engine/Rendering/Framebuffer.h"
 
 static bool IsModelFile(const std::filesystem::path& path)
 {

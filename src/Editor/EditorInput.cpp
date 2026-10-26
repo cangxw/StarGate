@@ -1,8 +1,8 @@
 #define GLFW_INCLUDE_NONE
 
 #include "EditorInput.h"
-#include "Engine/Camera.h"
-#include "Engine/SceneData.h"
+#include "Engine/Scene/Camera.h"
+#include "Engine/Scene/SceneData.h"
 #include "EditorUI.h"
 
 #include <GLFW/glfw3.h>
